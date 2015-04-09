@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/bobveznat/ssh-ca-ss/ssh_ca"
+	"github.com/cloudtools/ssh-cert-authority/util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
@@ -36,9 +36,14 @@ func main() {
 		os.Exit(0)
 	}
 
+	if len(flag.Args()) < 1 {
+		fmt.Println("Usage: get_cert [--environment env] cert-request-id")
+		os.Exit(1)
+	}
 	certRequestID := flag.Args()[0]
 
-	allConfig, err := ssh_ca.LoadSignerConfig(configPath)
+	allConfig := make(map[string]ssh_cert_authority.RequesterConfig)
+	err := ssh_cert_authority.LoadConfig(configPath, &allConfig)
 	if err != nil {
 		fmt.Println("Load Config failed:", err)
 		os.Exit(1)
@@ -58,7 +63,11 @@ func main() {
 			// lame way of extracting first and only key from a map?
 		}
 	}
-	config := allConfig[environment]
+	config, ok := allConfig[environment]
+	if !ok {
+		fmt.Println("Requested environment not found in config file")
+		os.Exit(1)
+	}
 
 	getResp, err := http.Get(config.SignerUrl + "cert/requests/" + certRequestID)
 	if err != nil {
@@ -109,7 +118,7 @@ func main() {
 	fmt.Printf("  Principals: %v\n", cert.ValidPrincipals)
 	fmt.Printf("  Options: %v\n", cert.Permissions.CriticalOptions)
 	fmt.Printf("  Permissions: %v\n", cert.Permissions.Extensions)
-	fmt.Printf("  Valid for public key: %s\n", ssh_ca.MakeFingerprint(cert.Key.Marshal()))
+	fmt.Printf("  Valid for public key: %s\n", ssh_cert_authority.MakeFingerprint(cert.Key.Marshal()))
 	var colorStart, colorEnd string
 	if uint64(time.Now().Unix()+3600*24) < cert.ValidBefore {
 		colorStart = "\033[91m"

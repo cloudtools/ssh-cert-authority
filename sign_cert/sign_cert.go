@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/bobveznat/ssh-ca-ss/ssh_ca"
+	"github.com/cloudtools/ssh-cert-authority/util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
@@ -16,7 +16,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"time"
 )
 
 const buildVersion string = "dev"
@@ -49,7 +48,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	allConfig, err := ssh_ca.LoadSignerConfig(configPath)
+	allConfig := make(map[string]ssh_cert_authority.SignerConfig)
+	err := ssh_cert_authority.LoadConfig(configPath, &allConfig)
 	if err != nil {
 		fmt.Println("Load Config failed:", err)
 		os.Exit(1)
@@ -69,7 +69,11 @@ func main() {
 			// lame way of extracting first and only key from a map?
 		}
 	}
-	config := allConfig[environment]
+	config, ok := allConfig[environment]
+	if !ok {
+		fmt.Println("Requested environment not found in config file")
+		os.Exit(1)
+	}
 
 	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
@@ -87,7 +91,7 @@ func main() {
 		os.Exit(1)
 	} else {
 		for i := range signers {
-			signerFingerprint := ssh_ca.MakeFingerprint(signers[i].PublicKey().Marshal())
+			signerFingerprint := ssh_cert_authority.MakeFingerprint(signers[i].PublicKey().Marshal())
 			if signerFingerprint == config.KeyFingerprint {
 				signer = signers[i]
 				break
@@ -131,24 +135,10 @@ func main() {
 		fmt.Println("Trouble parsing response", err)
 		os.Exit(1)
 	}
-	cert := pubKey.(*ssh.Certificate)
+	cert := *pubKey.(*ssh.Certificate)
 	fmt.Printf("This cert is for the %s environment\n", getResponse[certRequestID].Environment)
 	fmt.Println("Reason:", getResponse[certRequestID].Reason)
-	fmt.Println("Certificate data:")
-	fmt.Printf("  Serial: %v\n", cert.Serial)
-	fmt.Printf("  Key id: %v\n", cert.KeyId)
-	fmt.Printf("  Principals: %v\n", cert.ValidPrincipals)
-	fmt.Printf("  Options: %v\n", cert.Permissions.CriticalOptions)
-	fmt.Printf("  Permissions: %v\n", cert.Permissions.Extensions)
-	fmt.Printf("  Valid for public key: %s\n", ssh_ca.MakeFingerprint(cert.Key.Marshal()))
-	var colorStart, colorEnd string
-	if uint64(time.Now().Unix()+3600*24) < cert.ValidBefore {
-		colorStart = "\033[91m"
-		colorEnd = "\033[0m"
-	}
-	fmt.Printf("  Valid from %v - %s%v%s\n",
-		time.Unix(int64(cert.ValidAfter), 0),
-		colorStart, time.Unix(int64(cert.ValidBefore), 0), colorEnd)
+	ssh_cert_authority.PrintForInspection(cert)
 	fmt.Printf("Type 'yes' if you'd like to sign this cert request ")
 	reader := bufio.NewReader(os.Stdin)
 	text, _ := reader.ReadString('\n')
