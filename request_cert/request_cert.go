@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"github.com/bobveznat/ssh-ca-ss/ssh_ca"
+	"github.com/cloudtools/ssh-cert-authority/util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
@@ -47,7 +47,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	config, err := ssh_ca.LoadRequesterConfig(configPath)
+	config := make(map[string]ssh_cert_authority.RequesterConfig)
+	err := ssh_cert_authority.LoadConfig(configPath, &config)
 	if err != nil {
 		fmt.Println("Load Config failed:", err)
 		os.Exit(1)
@@ -104,7 +105,7 @@ func main() {
 		fmt.Println("Trouble parsing your public key", err)
 		os.Exit(1)
 	}
-	chosenKeyFingerprint := ssh_ca.MakeFingerprint(pubKey.Marshal())
+	chosenKeyFingerprint := ssh_cert_authority.MakeFingerprint(pubKey.Marshal())
 
 	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
@@ -122,7 +123,7 @@ func main() {
 		os.Exit(1)
 	} else {
 		for i := range signers {
-			signerFingerprint := ssh_ca.MakeFingerprint(signers[i].PublicKey().Marshal())
+			signerFingerprint := ssh_cert_authority.MakeFingerprint(signers[i].PublicKey().Marshal())
 			if signerFingerprint == chosenKeyFingerprint {
 				signer = signers[i]
 				break
@@ -134,7 +135,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var newCert ssh_ca.SshCertificate
+	var newCert ssh.Certificate
 	newCert.Nonce = make([]byte, 32)
 	newCert.Key = signer.PublicKey()
 	newCert.Serial = 0

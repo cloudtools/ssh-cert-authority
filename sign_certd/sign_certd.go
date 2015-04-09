@@ -9,7 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/bobveznat/ssh-ca-ss/ssh_ca"
+	"github.com/cloudtools/ssh-cert-authority/util"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -43,19 +43,19 @@ func newcertRequest() certRequest {
 }
 
 type certRequestHandler struct {
-	Config     map[string]ssh_ca.SignerdConfig
+	Config     map[string]ssh_cert_authority.SignerdConfig
 	state      map[string]certRequest
 	sshAgent   agent.Agent
 	NextSerial chan uint64
 }
 
 type signingRequest struct {
-	config      *ssh_ca.SignerdConfig
+	config      *ssh_cert_authority.SignerdConfig
 	environment string
 	cert        *ssh.Certificate
 }
 
-func (h *certRequestHandler) formBoilerplate(req *http.Request) (*ssh_ca.SignerdConfig, string, error) {
+func (h *certRequestHandler) formBoilerplate(req *http.Request) (*ssh_cert_authority.SignerdConfig, string, error) {
 	err := req.ParseForm()
 	if err != nil {
 		err := fmt.Errorf("%v", err)
@@ -94,7 +94,7 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 		return
 	}
 
-	requesterFp := ssh_ca.MakeFingerprint(requestData.cert.SignatureKey.Marshal())
+	requesterFp := ssh_cert_authority.MakeFingerprint(requestData.cert.SignatureKey.Marshal())
 
 	requestID := make([]byte, 15)
 	rand.Reader.Read(requestID)
@@ -142,7 +142,7 @@ func (h *certRequestHandler) extractCertFromRequest(req *http.Request, requestDa
 
 	var certChecker ssh.CertChecker
 	certChecker.IsAuthority = func(auth ssh.PublicKey) bool {
-		fingerprint := ssh_ca.MakeFingerprint(auth.Marshal())
+		fingerprint := ssh_cert_authority.MakeFingerprint(auth.Marshal())
 		_, ok := authorizedSigners[fingerprint]
 		return ok
 	}
@@ -265,7 +265,7 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	signerFp := ssh_ca.MakeFingerprint(requestData.cert.SignatureKey.Marshal())
+	signerFp := ssh_cert_authority.MakeFingerprint(requestData.cert.SignatureKey.Marshal())
 
 	// Verifying that the cert being posted to us here matches the one in the
 	// request. That is, that an attacker isn't use an old signature to sign a
@@ -299,7 +299,7 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 			log.Println("No keys found.")
 		} else {
 			for i := range signers {
-				fp := ssh_ca.MakeFingerprint(signers[i].PublicKey().Marshal())
+				fp := ssh_cert_authority.MakeFingerprint(signers[i].PublicKey().Marshal())
 				if fp == config.SigningKeyFingerprint {
 					signer = &signers[i]
 					break
@@ -329,7 +329,8 @@ func main() {
 	flag.StringVar(&configPath, "configPath", configPath, "Path to config json.")
 	flag.Parse()
 
-	config, err := ssh_ca.LoadSignerdConfig(configPath)
+	config := make(map[string]ssh_cert_authority.SignerdConfig)
+	err := ssh_cert_authority.LoadConfig(configPath, &config)
 	if err != nil {
 		log.Println("Load Config failed:", err)
 		os.Exit(1)
