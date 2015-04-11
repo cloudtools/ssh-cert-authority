@@ -33,3 +33,4 @@ cert or sign someone's cert request the user must have the key used for
 signing loaded up in ssh-agent. Secrets are really hard to keep, we'll
 leave them in the memory space of ssh-agent.
 
+.. image:: https://drone.io/github.com/cloudtools/ssh-cert-authority/status.png
