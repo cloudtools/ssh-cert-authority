@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"github.com/cloudtools/ssh-cert-authority/client"
@@ -11,8 +10,6 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
 	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"time"
 )
@@ -73,7 +70,14 @@ func main() {
 		}
 	}
 
+	_, ok := config[environment]
+	if !ok {
+		fmt.Printf("Environment '%s' not found in config file.", environment)
+		os.Exit(1)
+	}
+
 	caRequest := ssh_ca_client.MakeRequest()
+	caRequest.SetConfig(config[environment])
 	failed := trueOnError(caRequest.SetEnvironment(environment))
 	failed |= trueOnError(caRequest.SetReason(reason))
 	failed |= trueOnError(caRequest.SetValidAfter(validAfterDur))
@@ -137,29 +141,12 @@ func main() {
 	}
 
 	certRequest := newCert.Marshal()
-	requestParameters := make(url.Values)
-	requestParameters["cert"] = make([]string, 1)
-	requestParameters["cert"][0] = base64.StdEncoding.EncodeToString(certRequest)
-	requestParameters["environment"] = make([]string, 1)
-	requestParameters["environment"][0] = environment
-	requestParameters["reason"] = make([]string, 1)
-	requestParameters["reason"][0] = reason
-	resp, err := http.PostForm(config[environment].SignerUrl+"cert/requests", requestParameters)
-	if err != nil {
-		fmt.Println("Error sending request to signer daemon:", err)
-		os.Exit(1)
-	}
-	respBuf, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		fmt.Println("Error retrieving response to our request. Try again?", err)
-		os.Exit(1)
-	}
-	if resp.StatusCode == 201 {
-		fmt.Printf("Cert request id: %s\n", string(respBuf))
+	requestParameters := caRequest.BuildWebRequest(certRequest)
+	requestID, err := caRequest.DoWebRequest(requestParameters)
+	if err == nil {
+		fmt.Printf("Cert request id: %s\n", requestID)
 	} else {
-		fmt.Printf("Cert request rejected: %s\n", string(respBuf))
-		os.Exit(1)
+		fmt.Println(err)
 	}
 
 }

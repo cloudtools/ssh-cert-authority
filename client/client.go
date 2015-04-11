@@ -1,9 +1,13 @@
 package ssh_ca_client
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/cloudtools/ssh-cert-authority/util"
 	"golang.org/x/crypto/ssh"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -16,12 +20,20 @@ type Request struct {
 	principals    []string
 	publicKey     ssh.PublicKey
 	keyID         string
-	requestConfig ssh_ca_util.RequesterConfig
+	config ssh_ca_util.RequesterConfig
 }
 
 func MakeRequest() Request {
 	var request Request
 	return request
+}
+
+func (req *Request) SetConfig(config ssh_ca_util.RequesterConfig) error {
+    if config.SignerUrl == "" {
+        return fmt.Errorf("Signer URL is empty. This isn't going to work")
+    }
+    req.config = config
+    return nil
 }
 
 func (req *Request) SetEnvironment(environment string) error {
@@ -102,4 +114,33 @@ func (req *Request) EncodeAsCertificate() (*ssh.Certificate, error) {
 	newCert.Extensions["permit-port-forwarding"] = ""
 	newCert.Extensions["permit-pty"] = ""
 	return &newCert, nil
+}
+
+func (req *Request) BuildWebRequest(signedCert []byte) url.Values {
+	requestParameters := make(url.Values)
+	requestParameters["cert"] = make([]string, 1)
+	requestParameters["cert"][0] = base64.StdEncoding.EncodeToString(signedCert)
+	requestParameters["environment"] = make([]string, 1)
+	requestParameters["environment"][0] = req.environment
+	requestParameters["reason"] = make([]string, 1)
+	requestParameters["reason"][0] = req.reason
+
+    return requestParameters
+}
+
+func (req *Request) DoWebRequest(requestParameters url.Values) (string, error) {
+	resp, err := http.PostForm(req.config.SignerUrl+"cert/requests", requestParameters)
+	if err != nil {
+        return "", err
+	}
+	respBuf, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+        return "", err
+	}
+	if resp.StatusCode == 201 {
+        return string(respBuf), nil
+	} else {
+        return "", fmt.Errorf("Cert request rejected: %s", string(respBuf))
+	}
 }
