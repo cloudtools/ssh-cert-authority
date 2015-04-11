@@ -65,5 +65,4 @@ func TestValid(t *testing.T) {
 	if cert.ValidBefore != req.validBefore {
 		t.Fatalf("valid before mismatch")
 	}
-	cert.Marshal()
 }
