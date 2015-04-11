@@ -22,3 +22,5 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+get_cert request_cert sign_cert sign_certd
