@@ -47,8 +47,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	config := make(map[string]ssh_cert_authority.RequesterConfig)
-	err := ssh_cert_authority.LoadConfig(configPath, &config)
+	config := make(map[string]ssh_ca_util.RequesterConfig)
+	err := ssh_ca_util.LoadConfig(configPath, &config)
 	if err != nil {
 		fmt.Println("Load Config failed:", err)
 		os.Exit(1)
@@ -105,7 +105,7 @@ func main() {
 		fmt.Println("Trouble parsing your public key", err)
 		os.Exit(1)
 	}
-	chosenKeyFingerprint := ssh_cert_authority.MakeFingerprint(pubKey.Marshal())
+	chosenKeyFingerprint := ssh_ca_util.MakeFingerprint(pubKey.Marshal())
 
 	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
@@ -123,7 +123,7 @@ func main() {
 		os.Exit(1)
 	} else {
 		for i := range signers {
-			signerFingerprint := ssh_cert_authority.MakeFingerprint(signers[i].PublicKey().Marshal())
+			signerFingerprint := ssh_ca_util.MakeFingerprint(signers[i].PublicKey().Marshal())
 			if signerFingerprint == chosenKeyFingerprint {
 				signer = signers[i]
 				break

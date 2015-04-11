@@ -48,8 +48,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	allConfig := make(map[string]ssh_cert_authority.SignerConfig)
-	err := ssh_cert_authority.LoadConfig(configPath, &allConfig)
+	allConfig := make(map[string]ssh_ca_util.SignerConfig)
+	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	if err != nil {
 		fmt.Println("Load Config failed:", err)
 		os.Exit(1)
@@ -91,7 +91,7 @@ func main() {
 		os.Exit(1)
 	} else {
 		for i := range signers {
-			signerFingerprint := ssh_cert_authority.MakeFingerprint(signers[i].PublicKey().Marshal())
+			signerFingerprint := ssh_ca_util.MakeFingerprint(signers[i].PublicKey().Marshal())
 			if signerFingerprint == config.KeyFingerprint {
 				signer = signers[i]
 				break
@@ -138,7 +138,7 @@ func main() {
 	cert := *pubKey.(*ssh.Certificate)
 	fmt.Printf("This cert is for the %s environment\n", getResponse[certRequestID].Environment)
 	fmt.Println("Reason:", getResponse[certRequestID].Reason)
-	ssh_cert_authority.PrintForInspection(cert)
+	ssh_ca_util.PrintForInspection(cert)
 	fmt.Printf("Type 'yes' if you'd like to sign this cert request ")
 	reader := bufio.NewReader(os.Stdin)
 	text, _ := reader.ReadString('\n')

@@ -1,4 +1,4 @@
-package ssh_cert_authority
+package ssh_ca_util
 
 import (
 	"encoding/json"

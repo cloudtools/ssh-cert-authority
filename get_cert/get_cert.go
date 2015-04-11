@@ -42,8 +42,8 @@ func main() {
 	}
 	certRequestID := flag.Args()[0]
 
-	allConfig := make(map[string]ssh_cert_authority.RequesterConfig)
-	err := ssh_cert_authority.LoadConfig(configPath, &allConfig)
+	allConfig := make(map[string]ssh_ca_util.RequesterConfig)
+	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	if err != nil {
 		fmt.Println("Load Config failed:", err)
 		os.Exit(1)
@@ -112,32 +112,20 @@ func main() {
 		fmt.Printf("Couldn't write certificate file to %s: %s\n", pubKeyPath, err)
 	}
 
-	fmt.Println("Certificate data:")
-	fmt.Printf("  Serial: %v\n", cert.Serial)
-	fmt.Printf("  Key id: %v\n", cert.KeyId)
-	fmt.Printf("  Principals: %v\n", cert.ValidPrincipals)
-	fmt.Printf("  Options: %v\n", cert.Permissions.CriticalOptions)
-	fmt.Printf("  Permissions: %v\n", cert.Permissions.Extensions)
-	fmt.Printf("  Valid for public key: %s\n", ssh_cert_authority.MakeFingerprint(cert.Key.Marshal()))
-	var colorStart, colorEnd string
-	if uint64(time.Now().Unix()+3600*24) < cert.ValidBefore {
-		colorStart = "\033[91m"
-		colorEnd = "\033[0m"
+	secondsRemaining := int64(cert.ValidBefore) - int64(time.Now().Unix())
+	if secondsRemaining < 1 {
+		fmt.Println("This certificate has already expired.")
+		os.Exit(1)
 	}
-	fmt.Printf("  Valid from %v - %s%v%s\n",
-		time.Unix(int64(cert.ValidAfter), 0),
-		colorStart, time.Unix(int64(cert.ValidBefore), 0), colorEnd)
-
+	ssh_ca_util.PrintForInspection(*cert)
 	privKeyPath := strings.Replace(pubKeyPath, "-cert.pub", "", 1)
-	secondsRemaining := cert.ValidBefore - uint64(time.Now().Unix())
 	cmd := exec.Command("ssh-add", "-t", fmt.Sprintf("%d", secondsRemaining), privKeyPath)
-	var out bytes.Buffer
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	err = cmd.Run()
 	if err != nil {
-		fmt.Printf("Error in ssh-add: %v", out.String())
+		fmt.Println("Error in ssh-add")
 		os.Exit(1)
 	}
 }
