@@ -18,15 +18,7 @@ import (
 	"strings"
 )
 
-type listResponseElement struct {
-	Environment string
-	Reason      string
-	CertBlob    string
-}
-
-type certRequestResponse map[string]listResponseElement
-
-func main() {
+func signCert() {
 	var environment, certRequestID string
 
 	home := os.Getenv("HOME")

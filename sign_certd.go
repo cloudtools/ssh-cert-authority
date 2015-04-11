@@ -157,6 +157,7 @@ type listResponseElement struct {
 	Reason      string
 	CertBlob    string
 }
+type certRequestResponse map[string]listResponseElement
 
 func newResponseElement(environment string, reason string, certBlob string) listResponseElement {
 	var element listResponseElement
@@ -188,7 +189,7 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 	log.Printf("List pending requests received from %s for request id '%s'\n", req.RemoteAddr, certRequestID)
 
 	foundSomething := false
-	results := make(map[string]listResponseElement)
+	results := make(certRequestResponse)
 	for k, v := range h.state {
 		encodedCert := base64.StdEncoding.EncodeToString(v.request.Marshal())
 		element := newResponseElement(v.environment, v.reason, encodedCert)
@@ -318,7 +319,7 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 
 }
 
-func main() {
+func signCertd() {
 	home := os.Getenv("HOME")
 	if home == "" {
 		home = "/"

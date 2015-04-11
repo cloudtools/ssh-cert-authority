@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func main() {
+func getCert() {
 	var environment string
 
 	home := os.Getenv("HOME")

@@ -22,7 +22,7 @@ func trueOnError(err error) uint {
 	return 0
 }
 
-func main() {
+func requestCert() {
 	var principalsStr, environment, reason string
 	var validBeforeDur, validAfterDur time.Duration
 
