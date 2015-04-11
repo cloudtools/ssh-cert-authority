@@ -2,10 +2,10 @@ package main
 
 import (
 	"crypto/rand"
-	"flag"
 	"fmt"
 	"github.com/cloudtools/ssh-cert-authority/client"
 	"github.com/cloudtools/ssh-cert-authority/util"
+	"github.com/codegangsta/cli"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
@@ -22,44 +22,64 @@ func trueOnError(err error) uint {
 	return 0
 }
 
-func main() {
-	var principalsStr, environment, reason string
-	var validBeforeDur, validAfterDur time.Duration
-
+func requestCertFlags() []cli.Flag {
+	validBeforeDur, _ := time.ParseDuration("2h")
+	validAfterDur, _ := time.ParseDuration("-2m")
 	home := os.Getenv("HOME")
 	if home == "" {
 		home = "/"
 	}
 	configPath := home + "/.ssh_ca/requester_config.json"
 
-	validBeforeDur, _ = time.ParseDuration("2h")
-	validAfterDur, _ = time.ParseDuration("-2m")
-
-	flag.StringVar(&principalsStr, "principals", "ec2-user,ubuntu", "Valid usernames for login. Comma separated.")
-	flag.StringVar(&environment, "environment", "", "The environment you want (e.g. prod).")
-	flag.StringVar(&configPath, "configPath", configPath, "Path to config json.")
-	flag.StringVar(&reason, "reason", "", "Reason for needing SSH certificate.")
-	flag.DurationVar(&validAfterDur, "valid-after", validAfterDur, "Relative time")
-	flag.DurationVar(&validBeforeDur, "valid-before", validBeforeDur, "Relative time")
-	printVersion := flag.Bool("version", false, "Print the version and exit")
-	flag.Parse()
-
-	if *printVersion {
-		fmt.Printf("sign_cert v.%s\n", ssh_ca_util.BuildVersion)
-		os.Exit(0)
+	return []cli.Flag{
+		cli.StringFlag{
+			Name:  "principals",
+			Value: "ec2-user,ubuntu",
+			Usage: "Valid usernames for login, comma separated (e.g. ec2-user,ubuntu)",
+		},
+		cli.StringFlag{
+			Name:  "environment",
+			Value: "",
+			Usage: "An environment name (e.g. prod)",
+		},
+		cli.StringFlag{
+			Name:  "config-file",
+			Value: configPath,
+			Usage: "Path to config.json",
+		},
+		cli.StringFlag{
+			Name:  "reason",
+			Value: "",
+			Usage: "Your reason for needing this SSH certificate.",
+		},
+		cli.DurationFlag{
+			Name:  "valid-after",
+			Value: validAfterDur,
+			Usage: "Relative time",
+		},
+		cli.DurationFlag{
+			Name:  "valid-before",
+			Value: validBeforeDur,
+			Usage: "Relative time",
+		},
 	}
+}
 
+func requestCert(c *cli.Context) {
 	config := make(map[string]ssh_ca_util.RequesterConfig)
+	configPath := c.String("config-file")
 	err := ssh_ca_util.LoadConfig(configPath, &config)
 	if err != nil {
 		fmt.Println("Load Config failed:", err)
 		os.Exit(1)
 	}
 
+	reason := c.String("reason")
 	if reason == "" {
 		fmt.Println("Must give a reason for requesting this certificate.")
 		os.Exit(1)
 	}
+	environment := c.String("environment")
 	if len(config) > 1 && environment == "" {
 		fmt.Println("You must tell me which environment to use.", len(config))
 		os.Exit(1)
@@ -80,9 +100,9 @@ func main() {
 	caRequest.SetConfig(config[environment])
 	failed := trueOnError(caRequest.SetEnvironment(environment))
 	failed |= trueOnError(caRequest.SetReason(reason))
-	failed |= trueOnError(caRequest.SetValidAfter(validAfterDur))
-	failed |= trueOnError(caRequest.SetValidBefore(validBeforeDur))
-	failed |= trueOnError(caRequest.SetPrincipalsFromString(principalsStr))
+	failed |= trueOnError(caRequest.SetValidAfter(c.Duration("valid-after")))
+	failed |= trueOnError(caRequest.SetValidBefore(c.Duration("valid-before")))
+	failed |= trueOnError(caRequest.SetPrincipalsFromString(c.String("principals")))
 
 	if failed == 1 {
 		fmt.Println("One or more errors found. Aborting request.")

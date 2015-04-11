@@ -5,9 +5,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"github.com/cloudtools/ssh-cert-authority/util"
+	"github.com/codegangsta/cli"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
@@ -18,34 +18,29 @@ import (
 	"strings"
 )
 
-type listResponseElement struct {
-	Environment string
-	Reason      string
-	CertBlob    string
-}
-
-type certRequestResponse map[string]listResponseElement
-
-func main() {
-	var environment, certRequestID string
-
+func signCertFlags() []cli.Flag {
 	home := os.Getenv("HOME")
 	if home == "" {
 		home = "/"
 	}
 	configPath := home + "/.ssh_ca/signer_config.json"
 
-	flag.StringVar(&environment, "environment", "", "The environment you want (e.g. prod).")
-	flag.StringVar(&configPath, "configPath", configPath, "Path to config json.")
-	flag.StringVar(&certRequestID, "cert-request-id", certRequestID, "ID of cert request.")
-	printVersion := flag.Bool("version", false, "Print the version and exit")
-	flag.Parse()
-
-	if *printVersion {
-		fmt.Printf("sign_cert v.%s\n", ssh_ca_util.BuildVersion)
-		os.Exit(0)
+	return []cli.Flag{
+		cli.StringFlag{
+			Name:  "environment",
+			Value: "",
+			Usage: "An environment name (e.g. prod)",
+		},
+		cli.StringFlag{
+			Name:  "config-file",
+			Value: configPath,
+			Usage: "Path to config.json",
+		},
 	}
+}
 
+func signCert(c *cli.Context) {
+	configPath := c.String("config-file")
 	allConfig := make(map[string]ssh_ca_util.SignerConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	if err != nil {
@@ -53,11 +48,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	certRequestID := c.Args().First()
 	if certRequestID == "" {
-		fmt.Println("Specify --cert-request-id")
+		fmt.Println("Specify a cert-request-id")
 		os.Exit(1)
 	}
-
+	environment := c.String("environment")
 	if len(allConfig) > 1 && environment == "" {
 		fmt.Println("You must tell me which environment to use.", len(allConfig))
 		os.Exit(1)

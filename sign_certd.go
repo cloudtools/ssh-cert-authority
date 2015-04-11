@@ -7,9 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"github.com/cloudtools/ssh-cert-authority/util"
+	"github.com/codegangsta/cli"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -157,6 +157,7 @@ type listResponseElement struct {
 	Reason      string
 	CertBlob    string
 }
+type certRequestResponse map[string]listResponseElement
 
 func newResponseElement(environment string, reason string, certBlob string) listResponseElement {
 	var element listResponseElement
@@ -318,14 +319,24 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 
 }
 
-func main() {
+func signdFlags() []cli.Flag {
 	home := os.Getenv("HOME")
 	if home == "" {
 		home = "/"
 	}
 	configPath := home + "/.ssh_ca/sign_certd_config.json"
-	flag.StringVar(&configPath, "configPath", configPath, "Path to config json.")
-	flag.Parse()
+
+	return []cli.Flag{
+		cli.StringFlag{
+			Name:  "config-file",
+			Value: configPath,
+			Usage: "Path to config.json",
+		},
+	}
+}
+
+func signCertd(c *cli.Context) {
+	configPath := c.String("config-file")
 
 	config := make(map[string]ssh_ca_util.SignerdConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &config)

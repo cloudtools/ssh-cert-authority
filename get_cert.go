@@ -2,9 +2,9 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"github.com/cloudtools/ssh-cert-authority/util"
+	"github.com/codegangsta/cli"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
@@ -16,29 +16,32 @@ import (
 	"time"
 )
 
-func main() {
-	var environment string
-
+func getCertFlags() []cli.Flag {
 	home := os.Getenv("HOME")
 	if home == "" {
 		home = "/"
 	}
 	configPath := home + "/.ssh_ca/requester_config.json"
 
-	flag.StringVar(&environment, "environment", "", "The environment you want (e.g. prod).")
-	printVersion := flag.Bool("version", false, "Print the version and exit")
-	flag.Parse()
-
-	if *printVersion {
-		fmt.Printf("sign_cert v.%s\n", ssh_ca_util.BuildVersion)
-		os.Exit(0)
+	return []cli.Flag{
+		cli.StringFlag{
+			Name:  "environment",
+			Value: "",
+			Usage: "An environment name (e.g. prod)",
+		},
+		cli.StringFlag{
+			Name:  "config-file",
+			Value: configPath,
+			Usage: "Path to config.json",
+		},
 	}
+}
 
-	if len(flag.Args()) < 1 {
-		fmt.Println("Usage: get_cert [--environment env] cert-request-id")
-		os.Exit(1)
-	}
-	certRequestID := flag.Args()[0]
+func getCert(c *cli.Context) {
+
+	configPath := c.String("config-file")
+	environment := c.String("environment")
+	certRequestID := c.Args().First()
 
 	allConfig := make(map[string]ssh_ca_util.RequesterConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
@@ -48,7 +51,7 @@ func main() {
 	}
 
 	if certRequestID == "" {
-		fmt.Println("Specify --cert-request-id")
+		fmt.Println("You must give a certificate request id")
 		os.Exit(1)
 	}
 

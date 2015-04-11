@@ -13,14 +13,14 @@ import (
 )
 
 type Request struct {
-	environment   string
-	reason        string
-	validAfter    uint64
-	validBefore   uint64
-	principals    []string
-	publicKey     ssh.PublicKey
-	keyID         string
-	config ssh_ca_util.RequesterConfig
+	environment string
+	reason      string
+	validAfter  uint64
+	validBefore uint64
+	principals  []string
+	publicKey   ssh.PublicKey
+	keyID       string
+	config      ssh_ca_util.RequesterConfig
 }
 
 func MakeRequest() Request {
@@ -29,11 +29,11 @@ func MakeRequest() Request {
 }
 
 func (req *Request) SetConfig(config ssh_ca_util.RequesterConfig) error {
-    if config.SignerUrl == "" {
-        return fmt.Errorf("Signer URL is empty. This isn't going to work")
-    }
-    req.config = config
-    return nil
+	if config.SignerUrl == "" {
+		return fmt.Errorf("Signer URL is empty. This isn't going to work")
+	}
+	req.config = config
+	return nil
 }
 
 func (req *Request) SetEnvironment(environment string) error {
@@ -125,22 +125,22 @@ func (req *Request) BuildWebRequest(signedCert []byte) url.Values {
 	requestParameters["reason"] = make([]string, 1)
 	requestParameters["reason"][0] = req.reason
 
-    return requestParameters
+	return requestParameters
 }
 
 func (req *Request) DoWebRequest(requestParameters url.Values) (string, error) {
 	resp, err := http.PostForm(req.config.SignerUrl+"cert/requests", requestParameters)
 	if err != nil {
-        return "", err
+		return "", err
 	}
 	respBuf, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-        return "", err
+		return "", err
 	}
 	if resp.StatusCode == 201 {
-        return string(respBuf), nil
+		return string(respBuf), nil
 	} else {
-        return "", fmt.Errorf("Cert request rejected: %s", string(respBuf))
+		return "", fmt.Errorf("Cert request rejected: %s", string(respBuf))
 	}
 }
