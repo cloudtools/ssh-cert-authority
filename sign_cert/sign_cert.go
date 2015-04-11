@@ -18,8 +18,6 @@ import (
 	"strings"
 )
 
-const buildVersion string = "dev"
-
 type listResponseElement struct {
 	Environment string
 	Reason      string
@@ -44,7 +42,7 @@ func main() {
 	flag.Parse()
 
 	if *printVersion {
-		fmt.Printf("sign_cert v.%s\n", buildVersion)
+		fmt.Printf("sign_cert v.%s\n", ssh_ca_util.BuildVersion)
 		os.Exit(0)
 	}
 

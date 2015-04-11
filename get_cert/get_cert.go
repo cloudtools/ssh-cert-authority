@@ -16,8 +16,6 @@ import (
 	"time"
 )
 
-const buildVersion string = "dev"
-
 func main() {
 	var environment string
 
@@ -32,7 +30,7 @@ func main() {
 	flag.Parse()
 
 	if *printVersion {
-		fmt.Printf("sign_cert v.%s\n", buildVersion)
+		fmt.Printf("sign_cert v.%s\n", ssh_ca_util.BuildVersion)
 		os.Exit(0)
 	}
 
