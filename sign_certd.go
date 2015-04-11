@@ -337,13 +337,16 @@ func signdFlags() []cli.Flag {
 
 func signCertd(c *cli.Context) {
 	configPath := c.String("config-file")
-
 	config := make(map[string]ssh_ca_util.SignerdConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &config)
 	if err != nil {
 		log.Println("Load Config failed:", err)
 		os.Exit(1)
 	}
+	runSignCertd(config)
+}
+
+func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) {
 	log.Println("Server running version", ssh_ca_util.BuildVersion)
 	log.Println("Server started with config", config)
 	log.Println("Using SSH agent at", os.Getenv("SSH_AUTH_SOCK"))
