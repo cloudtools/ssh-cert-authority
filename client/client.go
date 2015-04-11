@@ -1,0 +1,105 @@
+package ssh_ca_client
+
+import (
+	"fmt"
+	"github.com/cloudtools/ssh-cert-authority/util"
+	"golang.org/x/crypto/ssh"
+	"strings"
+	"time"
+)
+
+type Request struct {
+	environment   string
+	reason        string
+	validAfter    uint64
+	validBefore   uint64
+	principals    []string
+	publicKey     ssh.PublicKey
+	keyID         string
+	requestConfig ssh_ca_util.RequesterConfig
+}
+
+func MakeRequest() Request {
+	var request Request
+	return request
+}
+
+func (req *Request) SetEnvironment(environment string) error {
+	if environment == "" {
+		return fmt.Errorf("Environment must be set.")
+	}
+	if len(environment) > 50 {
+		return fmt.Errorf("Environment is too long.")
+	}
+	req.environment = environment
+	return nil
+}
+
+func (req *Request) SetReason(reason string) error {
+	if reason == "" {
+		return fmt.Errorf("You must specify a reason.")
+	}
+	if len(reason) > 255 {
+		return fmt.Errorf("Reason is too long.")
+	}
+	req.reason = reason
+	return nil
+}
+
+func (req *Request) SetValidAfter(validAfter time.Duration) error {
+	timeNow := time.Now().Unix()
+	req.validAfter = uint64(timeNow + int64(validAfter.Seconds()))
+	return nil
+}
+
+func (req *Request) SetValidBefore(validBefore time.Duration) error {
+	timeNow := time.Now().Unix()
+	req.validBefore = uint64(timeNow + int64(validBefore.Seconds()))
+	return nil
+}
+
+func (req *Request) SetPrincipalsFromString(principalsStr string) error {
+	principals := strings.Split(strings.TrimSpace(principalsStr), ",")
+	if principalsStr == "" {
+		return fmt.Errorf("You didn't specify any principals. This cert is worthless.")
+	}
+	req.principals = principals
+	return nil
+}
+
+func (req *Request) SetPublicKey(pubKey ssh.PublicKey, keyID string) error {
+	req.publicKey = pubKey
+	req.keyID = keyID
+	return nil
+}
+
+func (req *Request) Validate() error {
+	if req.validAfter >= req.validBefore {
+		return fmt.Errorf("valid-after (%v) >= valid-before (%v). Which does not make sense.\n",
+			time.Unix(int64(req.validAfter), 0), time.Unix(int64(req.validBefore), 0))
+	}
+	return nil
+}
+
+func (req *Request) EncodeAsCertificate() (*ssh.Certificate, error) {
+	err := req.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	var newCert ssh.Certificate
+	// The sign() method fills in Nonce for us
+	newCert.Nonce = make([]byte, 32)
+	newCert.Key = req.publicKey
+	newCert.Serial = 0
+	newCert.CertType = ssh.UserCert
+	newCert.KeyId = req.keyID
+	newCert.ValidPrincipals = req.principals
+	newCert.ValidAfter = req.validAfter
+	newCert.ValidBefore = req.validBefore
+	newCert.Extensions = make(map[string]string)
+	newCert.Extensions["permit-agent-forwarding"] = ""
+	newCert.Extensions["permit-port-forwarding"] = ""
+	newCert.Extensions["permit-pty"] = ""
+	return &newCert, nil
+}
