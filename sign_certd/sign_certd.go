@@ -21,8 +21,6 @@ import (
 	"time"
 )
 
-const buildVersion string = "dev"
-
 type certRequest struct {
 	// This struct tracks state for certificate requests. Imagine this one day
 	// being stored in a persistent data store.
@@ -335,7 +333,7 @@ func main() {
 		log.Println("Load Config failed:", err)
 		os.Exit(1)
 	}
-	log.Println("Server running version", buildVersion)
+	log.Println("Server running version", ssh_ca_util.BuildVersion)
 	log.Println("Server started with config", config)
 	log.Println("Using SSH agent at", os.Getenv("SSH_AUTH_SOCK"))
 
