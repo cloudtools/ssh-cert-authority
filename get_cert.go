@@ -34,6 +34,10 @@ func getCertFlags() []cli.Flag {
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
+		cli.BoolTFlag{
+			Name:  "add-key",
+			Usage: "When set automatically call ssh-add",
+		},
 	}
 }
 
@@ -93,14 +97,6 @@ func getCert(c *cli.Context) {
 	}
 	cert := pubKey.(*ssh.Certificate)
 
-	agentConn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
-	if err != nil {
-		fmt.Println("Dial failed:", err)
-		os.Exit(1)
-	}
-	sshAgent := agent.NewClient(agentConn)
-	// We genuinely don't care if this fails, its not actionable
-	sshAgent.Remove(cert.Key)
 	pubKeyPath, err := findKeyLocally(cert.Key)
 
 	if err != nil {
@@ -119,15 +115,26 @@ func getCert(c *cli.Context) {
 		os.Exit(1)
 	}
 	ssh_ca_util.PrintForInspection(*cert)
-	privKeyPath := strings.Replace(pubKeyPath, "-cert.pub", "", 1)
-	cmd := exec.Command("ssh-add", "-t", fmt.Sprintf("%d", secondsRemaining), privKeyPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println("Error in ssh-add")
-		os.Exit(1)
+	if c.BoolT("add-key") {
+		agentConn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+		if err != nil {
+			fmt.Println("Dial failed:", err)
+			os.Exit(1)
+		}
+		sshAgent := agent.NewClient(agentConn)
+		// We genuinely don't care if this fails, its not actionable
+		sshAgent.Remove(cert.Key)
+
+		privKeyPath := strings.Replace(pubKeyPath, "-cert.pub", "", 1)
+		cmd := exec.Command("ssh-add", "-t", fmt.Sprintf("%d", secondsRemaining), privKeyPath)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		err = cmd.Run()
+		if err != nil {
+			fmt.Println("Error in ssh-add")
+			os.Exit(1)
+		}
 	}
 }
 

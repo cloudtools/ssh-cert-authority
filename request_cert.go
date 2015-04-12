@@ -62,6 +62,10 @@ func requestCertFlags() []cli.Flag {
 			Value: validBeforeDur,
 			Usage: "Relative time",
 		},
+		cli.BoolFlag{
+			Name:  "quiet",
+			Usage: "Print only the request id on success",
+		},
 	}
 }
 
@@ -164,7 +168,11 @@ func requestCert(c *cli.Context) {
 	requestParameters := caRequest.BuildWebRequest(certRequest)
 	requestID, err := caRequest.DoWebRequest(requestParameters)
 	if err == nil {
-		fmt.Printf("Cert request id: %s\n", requestID)
+		if c.Bool("quiet") {
+			fmt.Println(requestID)
+		} else {
+			fmt.Printf("Cert request id: %s\n", requestID)
+		}
 	} else {
 		fmt.Println(err)
 	}
