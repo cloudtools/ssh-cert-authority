@@ -219,7 +219,8 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 		http.Error(rw, "Invalid certRequestId", http.StatusBadRequest)
 		return
 	}
-	log.Printf("List pending requests received from %s for request id '%s'\n", req.RemoteAddr, certRequestID)
+	log.Printf("List pending requests received from %s for request id '%s'\n",
+		req.RemoteAddr, certRequestID)
 
 	foundSomething := false
 	results := make(map[string]listResponseElement)
@@ -272,58 +273,59 @@ func (h *certRequestHandler) getRequestStatus(rw http.ResponseWriter, req *http.
 
 func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Request) {
 
-	uriVars := mux.Vars(req)
-	requestID := uriVars["requestID"]
-
-	_, ok := h.state[requestID]
+	requestID := mux.Vars(req)["requestID"]
+	originalRequest, ok := h.state[requestID]
 	if !ok {
 		http.Error(rw, "Unknown request id", http.StatusNotFound)
 		return
 	}
 
-	var requestData signingRequest
-	config, environment, err := h.formBoilerplate(req)
-	requestData.config = config
-	requestData.environment = environment
+	err := req.ParseForm()
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
 	}
 
-	requestData.cert, err = h.extractCertFromRequest(req, config.AuthorizedSigners)
+	envConfig, ok := h.Config[originalRequest.environment]
+	if !ok {
+		http.Error(rw, "Original request found to have an invalid env. Weird.", http.StatusBadRequest)
+		return
+	}
+
+	signedCert, err := h.extractCertFromRequest(req, envConfig.AuthorizedSigners)
 	if err != nil {
 		log.Println("Invalid certificate signing request received, ignoring")
 		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
 	}
 
-	signerFp := ssh_ca_util.MakeFingerprint(requestData.cert.SignatureKey.Marshal())
+	signerFp := ssh_ca_util.MakeFingerprint(signedCert.SignatureKey.Marshal())
 
 	// Verifying that the cert being posted to us here matches the one in the
-	// request. That is, that an attacker isn't use an old signature to sign a
+	// request. That is, that an attacker isn't using an old signature to sign a
 	// new/different request id
 	requestedCert := h.state[requestID].request
-	requestData.cert.SignatureKey = requestedCert.SignatureKey
-	requestData.cert.Signature = nil
+	signedCert.SignatureKey = requestedCert.SignatureKey
+	signedCert.Signature = nil
 	requestedCert.Signature = nil
 	// Resetting the Nonce felt wrong. But it turns out that when the signer
 	// signs the request the act of signing generates a new Nonce. So it will
 	// never match.
 	requestedCert.Nonce = []byte("")
-	requestData.cert.Nonce = []byte("")
-	if !bytes.Equal(requestedCert.Marshal(), requestData.cert.Marshal()) {
+	signedCert.Nonce = []byte("")
+	if !bytes.Equal(requestedCert.Marshal(), signedCert.Marshal()) {
 		log.Println("Signature was valid, but cert didn't match.")
 		log.Printf("Orig req: %#v\n", requestedCert)
-		log.Printf("Sign req: %#v\n", requestData.cert)
+		log.Printf("Sign req: %#v\n", signedCert)
 		http.Error(rw, "Signature was valid, but cert didn't match.", http.StatusBadRequest)
 		return
 	}
 
 	h.state[requestID].signatures[signerFp] = true
 	log.Printf("Signature for serial %d id %s received from %s (%s) @ %s and determined valid\n",
-		requestData.cert.Serial, requestID, signerFp, config.AuthorizedSigners[signerFp], req.RemoteAddr)
+		signedCert.Serial, requestID, signerFp, envConfig.AuthorizedSigners[signerFp], req.RemoteAddr)
 
-	if len(h.state[requestID].signatures) >= config.NumberSignersRequired {
+	if len(h.state[requestID].signatures) >= envConfig.NumberSignersRequired {
 		log.Printf("Received %d signatures for %s, signing now.\n", len(h.state[requestID].signatures), requestID)
 		signers, err := h.sshAgent.Signers()
 		var signer *ssh.Signer
@@ -332,7 +334,7 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 		} else {
 			for i := range signers {
 				fp := ssh_ca_util.MakeFingerprint(signers[i].PublicKey().Marshal())
-				if fp == config.SigningKeyFingerprint {
+				if fp == envConfig.SigningKeyFingerprint {
 					signer = &signers[i]
 					break
 				}

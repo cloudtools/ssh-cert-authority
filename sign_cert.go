@@ -98,8 +98,6 @@ func signCert(c *cli.Context) {
 	}
 
 	requestParameters := make(url.Values)
-	requestParameters["environment"] = make([]string, 1)
-	requestParameters["environment"][0] = environment
 	requestParameters["certRequestId"] = make([]string, 1)
 	requestParameters["certRequestId"][0] = certRequestID
 	getResp, err := http.Get(config.SignerUrl + "cert/requests?" + requestParameters.Encode())
@@ -152,8 +150,6 @@ func signCert(c *cli.Context) {
 	requestParameters = make(url.Values)
 	requestParameters["cert"] = make([]string, 1)
 	requestParameters["cert"][0] = base64.StdEncoding.EncodeToString(signedRequest)
-	requestParameters["environment"] = make([]string, 1)
-	requestParameters["environment"][0] = environment
 	resp, err := http.PostForm(config.SignerUrl+"cert/requests/"+certRequestID, requestParameters)
 	if err != nil {
 		fmt.Println("Error sending request to signer daemon:", err)
