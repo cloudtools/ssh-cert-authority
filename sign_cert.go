@@ -121,8 +121,12 @@ func signCert(c *cli.Context) {
 		fmt.Println("Unable to unmarshall response", err)
 		os.Exit(1)
 	}
-	parseableCert := []byte("ssh-rsa-cert-v01@openssh.com " + getResponse[certRequestID].CertBlob)
-	pubKey, _, _, _, err := ssh.ParseAuthorizedKey(parseableCert)
+	rawCert, err := base64.StdEncoding.DecodeString(getResponse[certRequestID].CertBlob)
+	if err != nil {
+		fmt.Println("Trouble base64 decoding response", err)
+		os.Exit(1)
+	}
+	pubKey, err := ssh.ParsePublicKey(rawCert)
 	if err != nil {
 		fmt.Println("Trouble parsing response", err)
 		os.Exit(1)
