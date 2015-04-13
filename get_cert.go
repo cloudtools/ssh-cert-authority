@@ -6,9 +6,7 @@ import (
 	"github.com/cloudtools/ssh-cert-authority/util"
 	"github.com/codegangsta/cli"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -49,30 +47,12 @@ func getCert(c *cli.Context) {
 
 	allConfig := make(map[string]ssh_ca_util.RequesterConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
+	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
 	if err != nil {
-		fmt.Println("Load Config failed:", err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	if certRequestID == "" {
-		fmt.Println("You must give a certificate request id")
-		os.Exit(1)
-	}
-
-	if len(allConfig) > 1 && environment == "" {
-		fmt.Println("You must tell me which environment to use.", len(allConfig))
-		os.Exit(1)
-	}
-	if len(allConfig) == 1 && environment == "" {
-		for environment = range allConfig {
-			// lame way of extracting first and only key from a map?
-		}
-	}
-	config, ok := allConfig[environment]
-	if !ok {
-		fmt.Println("Requested environment not found in config file")
-		os.Exit(1)
-	}
+	config := wrongTypeConfig.(ssh_ca_util.RequesterConfig)
 
 	getResp, err := http.Get(config.SignerUrl + "cert/requests/" + certRequestID)
 	if err != nil {
@@ -96,6 +76,11 @@ func getCert(c *cli.Context) {
 		os.Exit(1)
 	}
 	cert := pubKey.(*ssh.Certificate)
+	secondsRemaining := int64(cert.ValidBefore) - int64(time.Now().Unix())
+	if secondsRemaining < 1 {
+		fmt.Println("This certificate has already expired.")
+		os.Exit(1)
+	}
 
 	pubKeyPath, err := findKeyLocally(cert.Key)
 
@@ -109,22 +94,8 @@ func getCert(c *cli.Context) {
 		fmt.Printf("Couldn't write certificate file to %s: %s\n", pubKeyPath, err)
 	}
 
-	secondsRemaining := int64(cert.ValidBefore) - int64(time.Now().Unix())
-	if secondsRemaining < 1 {
-		fmt.Println("This certificate has already expired.")
-		os.Exit(1)
-	}
 	ssh_ca_util.PrintForInspection(*cert)
 	if c.BoolT("add-key") {
-		agentConn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
-		if err != nil {
-			fmt.Println("Dial failed:", err)
-			os.Exit(1)
-		}
-		sshAgent := agent.NewClient(agentConn)
-		// We genuinely don't care if this fails, its not actionable
-		sshAgent.Remove(cert.Key)
-
 		privKeyPath := strings.Replace(pubKeyPath, "-cert.pub", "", 1)
 		cmd := exec.Command("ssh-add", "-t", fmt.Sprintf("%d", secondsRemaining), privKeyPath)
 		cmd.Stdout = os.Stdout
