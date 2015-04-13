@@ -99,9 +99,7 @@ func (req *Request) EncodeAsCertificate() (*ssh.Certificate, error) {
 		return nil, err
 	}
 
-	var newCert ssh.Certificate
-	// The sign() method fills in Nonce for us
-	newCert.Nonce = make([]byte, 32)
+	newCert := ssh_ca_util.MakeCertificate()
 	newCert.Key = req.publicKey
 	newCert.Serial = 0
 	newCert.CertType = ssh.UserCert

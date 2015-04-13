@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+func MakeCertificate() ssh.Certificate {
+	var newCert ssh.Certificate
+	// The sign() method fills in Nonce for us
+	newCert.Nonce = make([]byte, 32)
+	return newCert
+}
+
 func PrintForInspection(cert ssh.Certificate) {
 	fmt.Println("Certificate data:")
 	fmt.Printf("  Serial: %v\n", cert.Serial)
@@ -15,7 +22,11 @@ func PrintForInspection(cert ssh.Certificate) {
 	fmt.Printf("  Principals: %v\n", cert.ValidPrincipals)
 	fmt.Printf("  Options: %v\n", cert.Permissions.CriticalOptions)
 	fmt.Printf("  Permissions: %v\n", cert.Permissions.Extensions)
-	fmt.Printf("  Valid for public key: %s\n", MakeFingerprint(cert.Key.Marshal()))
+	if cert.Key != nil {
+		fmt.Printf("  Valid for public key: %s\n", MakeFingerprint(cert.Key.Marshal()))
+	} else {
+		fmt.Printf("  PUBLIC KEY NOT PRESENT\n")
+	}
 	var colorStart, colorEnd string
 	if uint64(time.Now().Unix()+3600*24) < cert.ValidBefore {
 		colorStart = "\033[91m"
