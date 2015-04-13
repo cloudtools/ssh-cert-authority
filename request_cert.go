@@ -7,7 +7,6 @@ import (
 	"github.com/cloudtools/ssh-cert-authority/util"
 	"github.com/codegangsta/cli"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
 	"io/ioutil"
 	"net"
 	"os"
@@ -121,28 +120,13 @@ func requestCert(c *cli.Context) {
 		fmt.Println("Dial failed:", err)
 		os.Exit(1)
 	}
-	sshAgent := agent.NewClient(conn)
 
-	signers, err := sshAgent.Signers()
-	var signer ssh.Signer
-	signer = nil
+	signer, err := ssh_ca_util.GetSignerForFingerprint(chosenKeyFingerprint, conn)
 	if err != nil {
-		fmt.Println("No keys found in agent, can't sign request, bailing.")
-		fmt.Println("ssh-add the private half of the key you want to use.")
-		os.Exit(1)
-	} else {
-		for i := range signers {
-			signerFingerprint := ssh_ca_util.MakeFingerprint(signers[i].PublicKey().Marshal())
-			if signerFingerprint == chosenKeyFingerprint {
-				signer = signers[i]
-				break
-			}
-		}
-	}
-	if signer == nil {
-		fmt.Println("ssh-add the private half of the key you want to use.")
+		fmt.Println(err)
 		os.Exit(1)
 	}
+
 	caRequest.SetPublicKey(signer.PublicKey(), pubKeyComment)
 	newCert, err := caRequest.EncodeAsCertificate()
 	if err != nil {

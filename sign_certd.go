@@ -12,7 +12,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/agent"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -41,10 +41,10 @@ func newcertRequest() certRequest {
 }
 
 type certRequestHandler struct {
-	Config     map[string]ssh_ca_util.SignerdConfig
-	state      map[string]certRequest
-	sshAgent   agent.Agent
-	NextSerial chan uint64
+	Config       map[string]ssh_ca_util.SignerdConfig
+	state        map[string]certRequest
+	sshAgentConn io.ReadWriter
+	NextSerial   chan uint64
 }
 
 type signingRequest struct {
@@ -327,26 +327,14 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 
 	if len(h.state[requestID].signatures) >= envConfig.NumberSignersRequired {
 		log.Printf("Received %d signatures for %s, signing now.\n", len(h.state[requestID].signatures), requestID)
-		signers, err := h.sshAgent.Signers()
-		var signer *ssh.Signer
+		signer, err := ssh_ca_util.GetSignerForFingerprint(envConfig.SigningKeyFingerprint, h.sshAgentConn)
 		if err != nil {
-			log.Println("No keys found.")
-		} else {
-			for i := range signers {
-				fp := ssh_ca_util.MakeFingerprint(signers[i].PublicKey().Marshal())
-				if fp == envConfig.SigningKeyFingerprint {
-					signer = &signers[i]
-					break
-				}
-			}
-		}
-		if signer == nil {
 			log.Printf("Couldn't find signing key for request %s, unable to sign request\n", requestID)
 			http.Error(rw, "Couldn't find signing key, unable to sign. Sorry.", http.StatusNotFound)
 			return
 		}
 		stateInfo := h.state[requestID]
-		stateInfo.request.SignCert(rand.Reader, *signer)
+		stateInfo.request.SignCert(rand.Reader, signer)
 		stateInfo.certSigned = true
 		// this is weird. see: https://code.google.com/p/go/issues/detail?id=3117
 		h.state[requestID] = stateInfo
@@ -400,14 +388,13 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) {
 	log.Println("Server started with config", config)
 	log.Println("Using SSH agent at", os.Getenv("SSH_AUTH_SOCK"))
 
-	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+	sshAgentConn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		log.Println("Dial failed:", err)
 		os.Exit(1)
 	}
 	requestHandler := makeCertRequestHandler(config)
-	sshAgent := agent.NewClient(conn)
-	requestHandler.sshAgent = sshAgent
+	requestHandler.sshAgentConn = sshAgentConn
 
 	r := mux.NewRouter()
 	requests := r.Path("/cert/requests").Subrouter()
