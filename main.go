@@ -35,11 +35,10 @@ func main() {
 			Action:  getCert,
 		},
 		{
-			Name:    "runserver",
-			Aliases: []string{"g"},
-			Flags:   signdFlags(),
-			Usage:   "Get a certificate",
-			Action:  signCertd,
+			Name:   "runserver",
+			Flags:  signdFlags(),
+			Usage:  "Get a certificate",
+			Action: signCertd,
 		},
 	}
 	app.Run(os.Args)
