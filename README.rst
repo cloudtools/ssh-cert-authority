@@ -325,3 +325,6 @@ Signing Requests
 ================
 
 See USAGE.rst in this directory.
+
+All in one basic happy test case::
+  go build && reqId=$(./ssh-cert-authority request --reason testing --environment test --quiet) &&./ssh-cert-authority sign --environment test --cert-request-id $reqId && ./ssh-cert-authority get --add-key=false --environment test $reqId
