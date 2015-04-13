@@ -9,7 +9,7 @@ Super basic
 -----------
 ::
 
-  request_cert --environment stage --reason "Do important maintenance work"
+  ssh-cert-authority request --environment stage --reason "Do important maintenance work"
 
 
 Configuration
@@ -43,7 +43,7 @@ Making a request
 
 Once configured requesting a certificate is as simple as::
 
-  request_cert --environment stage --reason "Do important maintenance work"
+  ssh-cert-authority request --environment stage --reason "Do important maintenance work"
 
 This will print out a certificate request id like so::
 
@@ -68,7 +68,7 @@ Signing certificates
 Super basic
 -----------
 ::
-    sign_cert --environment stage --cert-request-id HWK6CTFJDPTXRAXD7S6NZHO3
+    ssh-cert-authority sign --environment stage HWK6CTFJDPTXRAXD7S6NZHO3
 
 Configuration
 -------------
@@ -103,7 +103,7 @@ for violations of your policy on shell access to machines.
 
 The signing portion of a request begins when someone sends you a request
 id. You then sign it by::
-    $ sign_cert --environment stage --cert-request-id HWK6CTFJDPTXRAXD7S6NZHO3
+    $ ssh-cert-authority sign --environment stage HWK6CTFJDPTXRAXD7S6NZHO3
     Certificate data:
       Serial: 2
       Key id: bvanzant+stage@brkt.com
@@ -143,4 +143,18 @@ In order for sign_cert to run your SSH key must be loaded in ssh-agent
 (via ssh-add). Otherwise sign_cert will exit with an error::
 
   ssh-add the private half of the key you want to use.
+
+Downloading a signed certificate
+================================
+
+Super basic
+-----------
+::
+  ssh-cert-authority get --environment stage HWK6CTFJDPTXRAXD7S6NZHO3
+
+Configuration
+-------------
+
+The get command uses the requester_config.json file described under
+requesting a certificate.
 
