@@ -35,6 +35,11 @@ func signCertFlags() []cli.Flag {
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
+		cli.StringFlag{
+			Name:  "cert-request-id",
+			Value: "",
+			Usage: "The certificate request id to look at. Also works as a positional argument.",
+		},
 	}
 }
 
@@ -47,10 +52,13 @@ func signCert(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	certRequestID := c.Args().First()
+	certRequestID := c.String("cert-request-id")
 	if certRequestID == "" {
-		fmt.Println("Specify a cert-request-id")
-		os.Exit(1)
+		certRequestID = c.Args().First()
+		if certRequestID == "" {
+			fmt.Println("Specify a cert-request-id")
+			os.Exit(1)
+		}
 	}
 	environment := c.String("environment")
 	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
