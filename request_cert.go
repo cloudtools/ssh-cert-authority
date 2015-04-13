@@ -70,9 +70,9 @@ func requestCertFlags() []cli.Flag {
 }
 
 func requestCert(c *cli.Context) {
-	config := make(map[string]ssh_ca_util.RequesterConfig)
+	allConfig := make(map[string]ssh_ca_util.RequesterConfig)
 	configPath := c.String("config-file")
-	err := ssh_ca_util.LoadConfig(configPath, &config)
+	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	if err != nil {
 		fmt.Println("Load Config failed:", err)
 		os.Exit(1)
@@ -84,24 +84,15 @@ func requestCert(c *cli.Context) {
 		os.Exit(1)
 	}
 	environment := c.String("environment")
-	if len(config) > 1 && environment == "" {
-		fmt.Println("You must tell me which environment to use.", len(config))
+	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
+	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
-	if len(config) == 1 && environment == "" {
-		for environment = range config {
-			// lame way of extracting first and only key from a map?
-		}
-	}
-
-	_, ok := config[environment]
-	if !ok {
-		fmt.Printf("Environment '%s' not found in config file.", environment)
-		os.Exit(1)
-	}
+	config := wrongTypeConfig.(ssh_ca_util.RequesterConfig)
 
 	caRequest := ssh_ca_client.MakeRequest()
-	caRequest.SetConfig(config[environment])
+	caRequest.SetConfig(config)
 	failed := trueOnError(caRequest.SetEnvironment(environment))
 	failed |= trueOnError(caRequest.SetReason(reason))
 	failed |= trueOnError(caRequest.SetValidAfter(c.Duration("valid-after")))
@@ -113,9 +104,9 @@ func requestCert(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	pubKeyContents, err := ioutil.ReadFile(config[environment].PublicKeyPath)
+	pubKeyContents, err := ioutil.ReadFile(config.PublicKeyPath)
 	if err != nil {
-		fmt.Println("Trouble opening your public key file", config[environment].PublicKeyPath, err)
+		fmt.Println("Trouble opening your public key file", config.PublicKeyPath, err)
 		os.Exit(1)
 	}
 	pubKey, pubKeyComment, _, _, err := ssh.ParseAuthorizedKey(pubKeyContents)

@@ -54,20 +54,12 @@ func signCert(c *cli.Context) {
 		os.Exit(1)
 	}
 	environment := c.String("environment")
-	if len(allConfig) > 1 && environment == "" {
-		fmt.Println("You must tell me which environment to use.", len(allConfig))
+	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
+	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
-	if len(allConfig) == 1 && environment == "" {
-		for environment = range allConfig {
-			// lame way of extracting first and only key from a map?
-		}
-	}
-	config, ok := allConfig[environment]
-	if !ok {
-		fmt.Println("Requested environment not found in config file")
-		os.Exit(1)
-	}
+	config := wrongTypeConfig.(ssh_ca_util.SignerConfig)
 
 	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
