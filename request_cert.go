@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rand"
 	"fmt"
 	"github.com/cloudtools/ssh-cert-authority/client"
@@ -10,6 +11,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -77,11 +79,6 @@ func requestCert(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	reason := c.String("reason")
-	if reason == "" {
-		fmt.Println("Must give a reason for requesting this certificate.")
-		os.Exit(1)
-	}
 	environment := c.String("environment")
 	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
 	if err != nil {
@@ -89,6 +86,18 @@ func requestCert(c *cli.Context) {
 		os.Exit(1)
 	}
 	config := wrongTypeConfig.(ssh_ca_util.RequesterConfig)
+
+	reason := c.String("reason")
+	if reason == "" {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Please give a reason: ")
+		reason, _ = reader.ReadString('\n')
+		reason = strings.TrimSpace(reason)
+	}
+	if reason == "" {
+		fmt.Println("Failed to give a reason.")
+		os.Exit(1)
+	}
 
 	caRequest := ssh_ca_client.MakeRequest()
 	caRequest.SetConfig(config)
