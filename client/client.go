@@ -111,6 +111,8 @@ func (req *Request) EncodeAsCertificate() (*ssh.Certificate, error) {
 	newCert.Extensions["permit-agent-forwarding"] = ""
 	newCert.Extensions["permit-port-forwarding"] = ""
 	newCert.Extensions["permit-pty"] = ""
+	newCert.Extensions["ca-reason"] = req.reason
+	newCert.Extensions["ca-environment"] = req.environment
 	return &newCert, nil
 }
 
@@ -120,8 +122,6 @@ func (req *Request) BuildWebRequest(signedCert []byte) url.Values {
 	requestParameters["cert"][0] = base64.StdEncoding.EncodeToString(signedCert)
 	requestParameters["environment"] = make([]string, 1)
 	requestParameters["environment"][0] = req.environment
-	requestParameters["reason"] = make([]string, 1)
-	requestParameters["reason"][0] = req.reason
 
 	return requestParameters
 }
