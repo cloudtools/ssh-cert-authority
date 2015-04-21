@@ -108,13 +108,8 @@ id. You then sign it by::
       Serial: 2
       Key id: bvanzant+stage@brkt.com
       Principals: [ec2-user ubuntu]
-      Options:
-      Permissions:
-          ca-environment: stage
-          ca-reason: testing build #11
-          permit-agent-forwarding:
-          permit-port-forwarding:
-          permit-pty:
+      Options: map[]
+      Permissions: map[permit-agent-forwarding: permit-port-forwarding: permit-pty:]
       Valid for public key: 1c:fd:36:27:db:48:3f:ad:e2:fe:55:45:67:b1:47:99
       Valid from 2015-03-31 08:21:39 -0700 PDT - 2015-03-31 10:21:39 -0700 PDT
     Type 'yes' if you'd like to sign this cert request
