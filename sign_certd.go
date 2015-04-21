@@ -84,16 +84,11 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 		return
 	}
 
-	reason, ok := cert.Extensions["ca-reason"]
-	if !ok || reason == "" {
+	if req.Form["reason"][0] == "" {
 		http.Error(rw, "You forgot to send in a reason", http.StatusBadRequest)
 		return
 	}
-
-	if cert.Extensions["ca-environment"] != environment {
-		http.Error(rw, "Environment in cert doesn't match form parameters", http.StatusBadRequest)
-		return
-	}
+	reason := req.Form["reason"][0]
 
 	requestID := make([]byte, 10)
 	rand.Reader.Read(requestID)

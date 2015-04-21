@@ -115,6 +115,8 @@ func signCert(c *cli.Context) {
 		os.Exit(1)
 	}
 	cert := *pubKey.(*ssh.Certificate)
+	fmt.Printf("This cert is for the %s environment\n", getResponse[certRequestID].Environment)
+	fmt.Println("Reason:", getResponse[certRequestID].Reason)
 	ssh_ca_util.PrintForInspection(cert)
 	fmt.Printf("Type 'yes' if you'd like to sign this cert request ")
 	reader := bufio.NewReader(os.Stdin)

@@ -20,14 +20,8 @@ func PrintForInspection(cert ssh.Certificate) {
 	fmt.Printf("  Serial: %v\n", cert.Serial)
 	fmt.Printf("  Key id: %v\n", cert.KeyId)
 	fmt.Printf("  Principals: %v\n", cert.ValidPrincipals)
-	fmt.Printf("  Options:\n")
-	for key := range cert.CriticalOptions {
-		fmt.Printf("      %s: %v\n", key, cert.Permissions.CriticalOptions[key])
-	}
-	fmt.Printf("  Permissions:\n")
-	for key := range cert.Extensions {
-		fmt.Printf("      %s: %v\n", key, cert.Permissions.Extensions[key])
-	}
+	fmt.Printf("  Options: %v\n", cert.Permissions.CriticalOptions)
+	fmt.Printf("  Permissions: %v\n", cert.Permissions.Extensions)
 	if cert.Key != nil {
 		fmt.Printf("  Valid for public key: %s\n", MakeFingerprint(cert.Key.Marshal()))
 	} else {
