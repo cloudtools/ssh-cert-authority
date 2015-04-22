@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cloudtools/ssh-cert-authority/client"
 	"github.com/cloudtools/ssh-cert-authority/util"
 	"github.com/codegangsta/cli"
 	"github.com/gorilla/mux"
@@ -113,6 +114,14 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 		req.RemoteAddr, cert.ValidPrincipals, cert.ValidAfter, cert.ValidBefore, reason)
 	rw.WriteHeader(http.StatusCreated)
 	rw.Write([]byte(requestIDStr))
+
+	if config.SlackUrl != "" {
+		slackMsg := fmt.Sprintf("SSH cert request from %s with id %s for %s", config.AuthorizedUsers[requesterFp], requestIDStr, reason)
+		err = ssh_ca_client.PostToSlack(config.SlackUrl, config.SlackChannel, slackMsg)
+		if err != nil {
+			log.Printf("Unable to post to slack: %v", err)
+		}
+	}
 
 	return
 }
@@ -337,6 +346,15 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 	log.Printf("Signature for serial %d id %s received from %s (%s) @ %s and determined valid\n",
 		signedCert.Serial, requestID, signerFp, envConfig.AuthorizedSigners[signerFp], req.RemoteAddr)
 
+	if envConfig.SlackUrl != "" {
+		slackMsg := fmt.Sprintf("SSH cert %s signed by %s making %d/%d signatures.",
+			requestID, envConfig.AuthorizedSigners[signerFp], len(h.state[requestID].signatures), envConfig.NumberSignersRequired)
+		err = ssh_ca_client.PostToSlack(envConfig.SlackUrl, envConfig.SlackChannel, slackMsg)
+		if err != nil {
+			log.Printf("Unable to post to slack: %v", err)
+		}
+	}
+
 	if len(h.state[requestID].signatures) >= envConfig.NumberSignersRequired {
 		log.Printf("Received %d signatures for %s, signing now.\n", len(h.state[requestID].signatures), requestID)
 		signer, err := ssh_ca_util.GetSignerForFingerprint(envConfig.SigningKeyFingerprint, h.sshAgentConn)
@@ -361,6 +379,13 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 		stateInfo.certSigned = true
 		// this is weird. see: https://code.google.com/p/go/issues/detail?id=3117
 		h.state[requestID] = stateInfo
+		if envConfig.SlackUrl != "" {
+			slackMsg := fmt.Sprintf("SSH cert request %s fully signed.", requestID)
+			err = ssh_ca_client.PostToSlack(envConfig.SlackUrl, envConfig.SlackChannel, slackMsg)
+			if err != nil {
+				log.Printf("Unable to post to slack: %v", err)
+			}
+		}
 	}
 }
 

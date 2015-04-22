@@ -16,6 +16,8 @@ type SignerdConfig struct {
 	AuthorizedSigners     map[string]string
 	AuthorizedUsers       map[string]string
 	NumberSignersRequired int
+	SlackUrl              string
+	SlackChannel          string
 }
 
 type SignerConfig struct {

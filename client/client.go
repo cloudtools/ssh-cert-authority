@@ -2,6 +2,7 @@ package ssh_ca_client
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"github.com/cloudtools/ssh-cert-authority/util"
 	"golang.org/x/crypto/ssh"
@@ -140,5 +141,40 @@ func (req *Request) DoWebRequest(requestParameters url.Values) (string, error) {
 		return string(respBuf), nil
 	} else {
 		return "", fmt.Errorf("Cert request rejected: %s", string(respBuf))
+	}
+}
+
+type SlackWebhookInput struct {
+	Text    string `json:"text"`
+	Channel string `json:"channel"`
+}
+
+func PostToSlack(slackUrl, slackChannel, msg string) error {
+	var webhookInput SlackWebhookInput
+	webhookInput.Text = msg
+	if slackChannel != "" {
+		webhookInput.Channel = slackChannel
+	}
+	output, err := json.Marshal(webhookInput)
+	if err != nil {
+		return err
+	}
+	requestParameters := make(url.Values)
+	requestParameters["payload"] = make([]string, 1)
+	requestParameters["payload"][0] = string(output)
+
+	resp, err := http.PostForm(slackUrl, requestParameters)
+	if err != nil {
+		return err
+	}
+	respBuf, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode == 200 {
+		return nil
+	} else {
+		return fmt.Errorf("Slack post rejected: %s", string(respBuf))
 	}
 }
