@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -84,11 +85,16 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 		return
 	}
 
-	if req.Form["reason"][0] == "" {
+	reason, ok := cert.Extensions["reason@cloudtools.github.io"]
+	if !ok || reason == "" {
 		http.Error(rw, "You forgot to send in a reason", http.StatusBadRequest)
 		return
 	}
-	reason := req.Form["reason"][0]
+
+	if cert.Extensions["environment@cloudtools.github.io"] != environment {
+		http.Error(rw, "Environment in cert doesn't match form parameters", http.StatusBadRequest)
+		return
+	}
 
 	requestID := make([]byte, 10)
 	rand.Reader.Read(requestID)
@@ -189,14 +195,16 @@ type listResponseElement struct {
 	Environment string
 	Reason      string
 	CertBlob    string
+	Signed      bool
 }
 type certRequestResponse map[string]listResponseElement
 
-func newResponseElement(environment string, reason string, certBlob string) listResponseElement {
+func newResponseElement(environment string, reason string, certBlob string, signed bool) listResponseElement {
 	var element listResponseElement
 	element.Environment = environment
 	element.Reason = reason
 	element.CertBlob = certBlob
+	element.Signed = signed
 	return element
 }
 
@@ -226,7 +234,7 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 	results := make(map[string]listResponseElement)
 	for k, v := range h.state {
 		encodedCert := base64.StdEncoding.EncodeToString(v.request.Marshal())
-		element := newResponseElement(v.environment, v.reason, encodedCert)
+		element := newResponseElement(v.environment, v.reason, encodedCert, v.certSigned)
 		// Two ways to use this URL. If caller specified a certRequestId
 		// then we return only that one. Otherwise everything.
 		if certRequestID == "" {
@@ -277,6 +285,10 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 	originalRequest, ok := h.state[requestID]
 	if !ok {
 		http.Error(rw, "Unknown request id", http.StatusNotFound)
+		return
+	}
+	if originalRequest.certSigned {
+		http.Error(rw, "Request already signed.", http.StatusConflict)
 		return
 	}
 
@@ -334,12 +346,22 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 			return
 		}
 		stateInfo := h.state[requestID]
+		for extensionName := range stateInfo.request.Extensions {
+			// sshd up to version 6.8 has a bug where optional extensions are
+			// treated as critical. If a cert contains any non-standard
+			// extensions, like ours, the server rejects the cert because it
+			// doesn't understand the extension. To cope with this we simply
+			// strip our non-standard extensions before doing the final
+			// signature. https://bugzilla.mindrot.org/show_bug.cgi?id=2387
+			if strings.Contains(extensionName, "@") {
+				delete(stateInfo.request.Extensions, extensionName)
+			}
+		}
 		stateInfo.request.SignCert(rand.Reader, signer)
 		stateInfo.certSigned = true
 		// this is weird. see: https://code.google.com/p/go/issues/detail?id=3117
 		h.state[requestID] = stateInfo
 	}
-
 }
 
 func signdFlags() []cli.Flag {
