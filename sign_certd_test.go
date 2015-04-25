@@ -75,29 +75,29 @@ func TestSaveRequestValidCert(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert := pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(&envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
 	if err != nil {
 		t.Fatalf("Should have succeeded. Failed with: %v", err)
 	}
 
-	err = requestHandler.saveSigningRequest(&envConfig, environment, "", "DEADBEEFDEAD1111", 1, cert)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "", "DEADBEEFDEAD1111", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed, reason was missing.")
 	}
-	err = requestHandler.saveSigningRequest(&envConfig, "", "reason: testing", "DEADBEEFDEAD2222", 1, cert)
+	err = requestHandler.saveSigningRequest(envConfig, "", "reason: testing", "DEADBEEFDEAD2222", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed, environment was missing.")
 	}
-	err = requestHandler.saveSigningRequest(&envConfig, environment, "reason: testing", "EEEFDF", 1, cert)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "EEEFDF", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed with invalid request id (too short).")
 	}
 
-	err = requestHandler.saveSigningRequest(&envConfig, environment, "reason: testing", "IAM_A_DUPLICATE_ID", 1, cert)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "IAM_A_DUPLICATE_ID", 1, cert)
 	if err != nil {
 		t.Fatalf("Should have succeeded. Failed with: %v", err)
 	}
-	err = requestHandler.saveSigningRequest(&envConfig, environment, "reason: testing", "IAM_A_DUPLICATE_ID", 1, cert)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "IAM_A_DUPLICATE_ID", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed with duplicate error")
 	}
@@ -114,7 +114,7 @@ func TestSaveRequestInvalidCert(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert := pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(&envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed with fingerprint not in list error.")
 	}

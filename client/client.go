@@ -121,8 +121,6 @@ func (req *Request) BuildWebRequest(signedCert []byte) url.Values {
 	requestParameters := make(url.Values)
 	requestParameters["cert"] = make([]string, 1)
 	requestParameters["cert"][0] = base64.StdEncoding.EncodeToString(signedCert)
-	requestParameters["environment"] = make([]string, 1)
-	requestParameters["environment"][0] = req.environment
 
 	return requestParameters
 }

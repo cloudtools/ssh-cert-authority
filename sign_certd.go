@@ -56,11 +56,6 @@ type signingRequest struct {
 }
 
 func (h *certRequestHandler) formBoilerplate(req *http.Request) (*ssh_ca_util.SignerdConfig, string, error) {
-	err := req.ParseForm()
-	if err != nil {
-		err := fmt.Errorf("%v", err)
-		return nil, "", err
-	}
 	if req.Form["environment"] == nil {
 		err := errors.New("Must specify environment")
 		return nil, "", err
@@ -75,14 +70,21 @@ func (h *certRequestHandler) formBoilerplate(req *http.Request) (*ssh_ca_util.Si
 }
 
 func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *http.Request) {
-	config, environment, err := h.formBoilerplate(req)
+	err := req.ParseForm()
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
 	}
-	cert, err := h.extractCertFromRequest(req, config.AuthorizedUsers)
+
+	cert, err := h.extractCertFromRequest(req)
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
+		return
+	}
+
+	environment, ok := cert.Extensions["environment@cloudtools.github.io"]
+	if !ok || environment == "" {
+		http.Error(rw, "You forgot to send in the environment", http.StatusBadRequest)
 		return
 	}
 
@@ -92,8 +94,15 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 		return
 	}
 
-	if cert.Extensions["environment@cloudtools.github.io"] != environment {
-		http.Error(rw, "Environment in cert doesn't match form parameters", http.StatusBadRequest)
+	config, ok := h.Config[environment]
+	if !ok {
+		http.Error(rw, "Unknown environment.", http.StatusBadRequest)
+		return
+	}
+	err = h.validateCert(cert, config.AuthorizedUsers)
+	if err != nil {
+		log.Println("Invalid certificate signing request received, ignoring")
+		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -126,7 +135,7 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 	return
 }
 
-func (h *certRequestHandler) saveSigningRequest(config *ssh_ca_util.SignerdConfig, environment, reason, requestIDStr string, requestSerial uint64, cert *ssh.Certificate) error {
+func (h *certRequestHandler) saveSigningRequest(config ssh_ca_util.SignerdConfig, environment, reason, requestIDStr string, requestSerial uint64, cert *ssh.Certificate) error {
 	requesterFp := ssh_ca_util.MakeFingerprint(cert.SignatureKey.Marshal())
 
 	// We override keyid here so that its a server controlled value. Instead of
@@ -166,7 +175,7 @@ func (h *certRequestHandler) saveSigningRequest(config *ssh_ca_util.SignerdConfi
 	return nil
 }
 
-func (h *certRequestHandler) extractCertFromRequest(req *http.Request, authorizedSigners map[string]string) (*ssh.Certificate, error) {
+func (h *certRequestHandler) extractCertFromRequest(req *http.Request) (*ssh.Certificate, error) {
 
 	if req.PostForm["cert"] == nil || len(req.PostForm["cert"]) == 0 {
 		err := errors.New("Please specify exactly one cert request")
@@ -184,20 +193,22 @@ func (h *certRequestHandler) extractCertFromRequest(req *http.Request, authorize
 		return nil, err
 	}
 
-	cert := pubKey.(*ssh.Certificate)
+	return pubKey.(*ssh.Certificate), nil
+}
 
+func (h *certRequestHandler) validateCert(cert *ssh.Certificate, authorizedSigners map[string]string) error {
 	var certChecker ssh.CertChecker
 	certChecker.IsAuthority = func(auth ssh.PublicKey) bool {
 		fingerprint := ssh_ca_util.MakeFingerprint(auth.Marshal())
 		_, ok := authorizedSigners[fingerprint]
 		return ok
 	}
-	err = certChecker.CheckCert(cert.ValidPrincipals[0], cert)
+	err := certChecker.CheckCert(cert.ValidPrincipals[0], cert)
 	if err != nil {
 		err := fmt.Errorf("Cert not valid: %v", err)
-		return nil, err
+		return err
 	}
-	return cert, nil
+	return nil
 }
 
 type listResponseElement struct {
@@ -309,7 +320,13 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	signedCert, err := h.extractCertFromRequest(req, envConfig.AuthorizedSigners)
+	signedCert, err := h.extractCertFromRequest(req)
+	if err != nil {
+		log.Println("Invalid certificate signing request received, ignoring")
+		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
+		return
+	}
+	err = h.validateCert(signedCert, envConfig.AuthorizedSigners)
 	if err != nil {
 		log.Println("Invalid certificate signing request received, ignoring")
 		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
