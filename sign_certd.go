@@ -201,17 +201,13 @@ func (h *certRequestHandler) extractCertFromRequest(req *http.Request, authorize
 }
 
 type listResponseElement struct {
-	Environment string
-	Reason      string
-	CertBlob    string
-	Signed      bool
+	Signed   bool
+	CertBlob string
 }
 type certRequestResponse map[string]listResponseElement
 
-func newResponseElement(environment string, reason string, certBlob string, signed bool) listResponseElement {
+func newResponseElement(certBlob string, signed bool) listResponseElement {
 	var element listResponseElement
-	element.Environment = environment
-	element.Reason = reason
 	element.CertBlob = certBlob
 	element.Signed = signed
 	return element
@@ -243,7 +239,7 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 	results := make(map[string]listResponseElement)
 	for k, v := range h.state {
 		encodedCert := base64.StdEncoding.EncodeToString(v.request.Marshal())
-		element := newResponseElement(v.environment, v.reason, encodedCert, v.certSigned)
+		element := newResponseElement(encodedCert, v.certSigned)
 		// Two ways to use this URL. If caller specified a certRequestId
 		// then we return only that one. Otherwise everything.
 		if certRequestID == "" {

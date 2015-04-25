@@ -34,12 +34,12 @@ func requestCertFlags() []cli.Flag {
 
 	return []cli.Flag{
 		cli.StringFlag{
-			Name:  "principals",
+			Name:  "principals, p",
 			Value: "ec2-user,ubuntu",
 			Usage: "Valid usernames for login, comma separated (e.g. ec2-user,ubuntu)",
 		},
 		cli.StringFlag{
-			Name:  "environment",
+			Name:  "environment, e",
 			Value: "",
 			Usage: "An environment name (e.g. prod)",
 		},
