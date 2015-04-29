@@ -9,14 +9,14 @@ import (
 const samplePublicKeyString string = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCqwK8IchsTOuW3snG3MuZHjINw8YNR4T0+jlSgjH/d93bN2fuABVvlxRiAjSNNWTmuln8Jyto5PFP4/FqDgjhra3qIb6luf1XPmlnHH23/o56RS3boNDsaXAPIPhghwODjPZX2dau5jAC2y0zvcSJv0nXrpDthdHiUjYLjHKcSSpSoTAXHV2yOYe+hQ6rA+ZwVevXQrkR1mexlm0eOdNxC4AsTp7kE5E4IN6Pa4w2K5axNa9cZ1MSh9afySpmc1dinbrUmqBFtOLh8tarPsuDcTGso9jWGH/06ENkU8jTP7YKf7J0YlSsye/iuVEASYz8w1M6PlK5D06VYp0P6flgP a-testing-key"
 
 func TestMakeRequest(t *testing.T) {
-	req := MakeRequest()
+	req := MakeCertRequest()
 	if req.environment != "" && req.reason != "" {
 		t.Errorf("Failed the very basic task of making an empty request")
 	}
 }
 
 func TestEmptyIsInvalid(t *testing.T) {
-	req := MakeRequest()
+	req := MakeCertRequest()
 	err := req.Validate()
 	if err == nil {
 		t.Errorf("An empty request was somehow valid.")
@@ -24,7 +24,7 @@ func TestEmptyIsInvalid(t *testing.T) {
 }
 
 func TestValid(t *testing.T) {
-	req := MakeRequest()
+	req := MakeCertRequest()
 	req.SetEnvironment("testing")
 	req.SetReason("this is a test of the emergency broadcast system")
 	dur, _ := time.ParseDuration("+2d")

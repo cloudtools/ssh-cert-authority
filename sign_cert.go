@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/cloudtools/ssh-cert-authority/client"
 	"github.com/cloudtools/ssh-cert-authority/util"
 	"github.com/codegangsta/cli"
 	"golang.org/x/crypto/ssh"
@@ -134,25 +135,14 @@ func signCert(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	signedRequest := cert.Marshal()
-
-	requestParameters = make(url.Values)
-	requestParameters["cert"] = make([]string, 1)
-	requestParameters["cert"][0] = base64.StdEncoding.EncodeToString(signedRequest)
-	resp, err := http.PostForm(config.SignerUrl+"cert/requests/"+certRequestID, requestParameters)
+	request := ssh_ca_client.MakeSigningRequest(cert, certRequestID, config)
+	requestWebParameters := request.BuildWebRequest()
+	err = request.PostToWeb(requestWebParameters)
 	if err != nil {
-		fmt.Println("Error sending request to signer daemon:", err)
+		fmt.Println("Error sending in +1:", err)
 		os.Exit(1)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == 200 {
-		fmt.Println("Signature accepted by server.")
 	} else {
-		fmt.Println("Cert signature not accepted.")
-		fmt.Println("HTTP status", resp.Status)
-		respBuf, _ := ioutil.ReadAll(resp.Body)
-		fmt.Println(string(respBuf))
-		os.Exit(1)
+		fmt.Println("Signature accepted by server.")
 	}
 
 }

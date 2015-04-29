@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type Request struct {
+type CertRequest struct {
 	environment string
 	reason      string
 	validAfter  uint64
@@ -24,12 +24,48 @@ type Request struct {
 	config      ssh_ca_util.RequesterConfig
 }
 
-func MakeRequest() Request {
-	var request Request
+func MakeCertRequest() CertRequest {
+	var request CertRequest
 	return request
 }
 
-func (req *Request) SetConfig(config ssh_ca_util.RequesterConfig) error {
+type SigningRequest struct {
+	signedCert ssh.Certificate
+	requestID  string
+	config     ssh_ca_util.SignerConfig
+}
+
+func MakeSigningRequest(cert ssh.Certificate, requestID string, config ssh_ca_util.SignerConfig) SigningRequest {
+	var request SigningRequest
+	request.signedCert = cert
+	request.requestID = requestID
+	request.config = config
+	return request
+}
+
+func (req *SigningRequest) BuildWebRequest() url.Values {
+	signedRequest := req.signedCert.Marshal()
+	requestParameters := make(url.Values)
+	requestParameters["cert"] = make([]string, 1)
+	requestParameters["cert"][0] = base64.StdEncoding.EncodeToString(signedRequest)
+	return requestParameters
+}
+
+func (req *SigningRequest) PostToWeb(requestParameters url.Values) error {
+	resp, err := http.PostForm(req.config.SignerUrl+"cert/requests/"+req.requestID, requestParameters)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		respBuf, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.Status, string(respBuf))
+	} else {
+		return nil
+	}
+}
+
+func (req *CertRequest) SetConfig(config ssh_ca_util.RequesterConfig) error {
 	if config.SignerUrl == "" {
 		return fmt.Errorf("Signer URL is empty. This isn't going to work")
 	}
@@ -37,7 +73,7 @@ func (req *Request) SetConfig(config ssh_ca_util.RequesterConfig) error {
 	return nil
 }
 
-func (req *Request) SetEnvironment(environment string) error {
+func (req *CertRequest) SetEnvironment(environment string) error {
 	if environment == "" {
 		return fmt.Errorf("Environment must be set.")
 	}
@@ -48,7 +84,7 @@ func (req *Request) SetEnvironment(environment string) error {
 	return nil
 }
 
-func (req *Request) SetReason(reason string) error {
+func (req *CertRequest) SetReason(reason string) error {
 	if reason == "" {
 		return fmt.Errorf("You must specify a reason.")
 	}
@@ -59,19 +95,19 @@ func (req *Request) SetReason(reason string) error {
 	return nil
 }
 
-func (req *Request) SetValidAfter(validAfter time.Duration) error {
+func (req *CertRequest) SetValidAfter(validAfter time.Duration) error {
 	timeNow := time.Now().Unix()
 	req.validAfter = uint64(timeNow + int64(validAfter.Seconds()))
 	return nil
 }
 
-func (req *Request) SetValidBefore(validBefore time.Duration) error {
+func (req *CertRequest) SetValidBefore(validBefore time.Duration) error {
 	timeNow := time.Now().Unix()
 	req.validBefore = uint64(timeNow + int64(validBefore.Seconds()))
 	return nil
 }
 
-func (req *Request) SetPrincipalsFromString(principalsStr string) error {
+func (req *CertRequest) SetPrincipalsFromString(principalsStr string) error {
 	principals := strings.Split(strings.TrimSpace(principalsStr), ",")
 	if principalsStr == "" {
 		return fmt.Errorf("You didn't specify any principals. This cert is worthless.")
@@ -80,13 +116,13 @@ func (req *Request) SetPrincipalsFromString(principalsStr string) error {
 	return nil
 }
 
-func (req *Request) SetPublicKey(pubKey ssh.PublicKey, keyID string) error {
+func (req *CertRequest) SetPublicKey(pubKey ssh.PublicKey, keyID string) error {
 	req.publicKey = pubKey
 	req.keyID = keyID
 	return nil
 }
 
-func (req *Request) Validate() error {
+func (req *CertRequest) Validate() error {
 	if req.validAfter >= req.validBefore {
 		return fmt.Errorf("valid-after (%v) >= valid-before (%v). Which does not make sense.\n",
 			time.Unix(int64(req.validAfter), 0), time.Unix(int64(req.validBefore), 0))
@@ -94,7 +130,7 @@ func (req *Request) Validate() error {
 	return nil
 }
 
-func (req *Request) EncodeAsCertificate() (*ssh.Certificate, error) {
+func (req *CertRequest) EncodeAsCertificate() (*ssh.Certificate, error) {
 	err := req.Validate()
 	if err != nil {
 		return nil, err
@@ -117,7 +153,7 @@ func (req *Request) EncodeAsCertificate() (*ssh.Certificate, error) {
 	return &newCert, nil
 }
 
-func (req *Request) BuildWebRequest(signedCert []byte) url.Values {
+func (req *CertRequest) BuildWebRequest(signedCert []byte) url.Values {
 	requestParameters := make(url.Values)
 	requestParameters["cert"] = make([]string, 1)
 	requestParameters["cert"][0] = base64.StdEncoding.EncodeToString(signedCert)
@@ -125,7 +161,7 @@ func (req *Request) BuildWebRequest(signedCert []byte) url.Values {
 	return requestParameters
 }
 
-func (req *Request) DoWebRequest(requestParameters url.Values) (string, error) {
+func (req *CertRequest) PostToWeb(requestParameters url.Values) (string, error) {
 	resp, err := http.PostForm(req.config.SignerUrl+"cert/requests", requestParameters)
 	if err != nil {
 		return "", err

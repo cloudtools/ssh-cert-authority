@@ -99,7 +99,7 @@ func requestCert(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	caRequest := ssh_ca_client.MakeRequest()
+	caRequest := ssh_ca_client.MakeCertRequest()
 	caRequest.SetConfig(config)
 	failed := trueOnError(caRequest.SetEnvironment(environment))
 	failed |= trueOnError(caRequest.SetReason(reason))
@@ -150,7 +150,7 @@ func requestCert(c *cli.Context) {
 
 	certRequest := newCert.Marshal()
 	requestParameters := caRequest.BuildWebRequest(certRequest)
-	requestID, err := caRequest.DoWebRequest(requestParameters)
+	requestID, err := caRequest.PostToWeb(requestParameters)
 	if err == nil {
 		if c.Bool("quiet") {
 			fmt.Println(requestID)
