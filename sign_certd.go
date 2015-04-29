@@ -55,20 +55,6 @@ type signingRequest struct {
 	cert        *ssh.Certificate
 }
 
-func (h *certRequestHandler) formBoilerplate(req *http.Request) (*ssh_ca_util.SignerdConfig, string, error) {
-	if req.Form["environment"] == nil {
-		err := errors.New("Must specify environment")
-		return nil, "", err
-	}
-	environment := req.Form["environment"][0]
-	config, ok := h.Config[environment]
-	if !ok {
-		err := errors.New("Environment is not configured (is it valid?)")
-		return nil, "", err
-	}
-	return &config, environment, nil
-}
-
 func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *http.Request) {
 	err := req.ParseForm()
 	if err != nil {
