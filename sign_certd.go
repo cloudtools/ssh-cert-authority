@@ -87,7 +87,7 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 	}
 	err = h.validateCert(cert, config.AuthorizedUsers)
 	if err != nil {
-		log.Println("Invalid certificate signing request received, ignoring")
+		log.Printf("Invalid certificate signing request received from %s, ignoring", req.RemoteAddr)
 		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
 	}
@@ -308,13 +308,13 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 
 	signedCert, err := h.extractCertFromRequest(req)
 	if err != nil {
-		log.Println("Invalid certificate signing request received, ignoring")
+		log.Printf("Unable to extract certificate signing request from %s, ignoring", req.RemoteAddr)
 		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
 	}
 	err = h.validateCert(signedCert, envConfig.AuthorizedSigners)
 	if err != nil {
-		log.Println("Invalid certificate signing request received, ignoring")
+		log.Printf("Invalid certificate signing request received from %s, ignoring", req.RemoteAddr)
 		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
 	}
@@ -334,7 +334,7 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 	requestedCert.Nonce = []byte("")
 	signedCert.Nonce = []byte("")
 	if !bytes.Equal(requestedCert.Marshal(), signedCert.Marshal()) {
-		log.Println("Signature was valid, but cert didn't match.")
+		log.Printf("Signature was valid, but cert didn't match from %s.", req.RemoteAddr)
 		log.Printf("Orig req: %#v\n", requestedCert)
 		log.Printf("Sign req: %#v\n", signedCert)
 		http.Error(rw, "Signature was valid, but cert didn't match.", http.StatusBadRequest)
@@ -350,7 +350,7 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 			requestID, envConfig.AuthorizedSigners[signerFp], len(h.state[requestID].signatures), envConfig.NumberSignersRequired)
 		err = ssh_ca_client.PostToSlack(envConfig.SlackUrl, envConfig.SlackChannel, slackMsg)
 		if err != nil {
-			log.Printf("Unable to post to slack: %v", err)
+			log.Printf("Unable to post to slack for %s: %v", requestID, err)
 		}
 	}
 
@@ -382,7 +382,7 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 			slackMsg := fmt.Sprintf("SSH cert request %s fully signed.", requestID)
 			err = ssh_ca_client.PostToSlack(envConfig.SlackUrl, envConfig.SlackChannel, slackMsg)
 			if err != nil {
-				log.Printf("Unable to post to slack: %v", err)
+				log.Printf("Unable to post to slack for %s: %v", requestID, err)
 			}
 		}
 	}
