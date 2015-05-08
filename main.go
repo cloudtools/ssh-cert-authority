@@ -37,7 +37,7 @@ func main() {
 		{
 			Name:   "runserver",
 			Flags:  signdFlags(),
-			Usage:  "Get a certificate",
+			Usage:  "Run the cert-authority web service",
 			Action: signCertd,
 		},
 	}
