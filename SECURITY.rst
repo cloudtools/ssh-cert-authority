@@ -52,6 +52,14 @@ The ssh-cert-authority must defend against an attacker submitting
 signatures on either requests or signing commands using keys that are
 not in the config.
 
+Attacker inserts vulnerabilities into the code
+----------------------------------------------
+
+This project is open source for many good reasons. An attacker could
+develop a patch that potentially injects a vulnerability into the code
+that is activated at a later time. Code review will be used to mitigate
+these kinds of threats.
+
 Unauthorized user submits signature for request
 -----------------------------------------------
 
