@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -32,6 +33,47 @@ type certRequest struct {
 	signatures  map[string]bool
 	certSigned  bool
 	reason      string
+}
+
+func compareCerts(one, two *ssh.Certificate) bool {
+	/* Compare two SSH certificates in a special way.
+
+	The specialness is in that we expect these certs to be more or less the
+	same but they will have been signed by different people. The act of signing
+	the cert changes the Key, SignatureKey, Signature and Nonce fields of the
+	Certificate struct so we compare the cert except for those fields.
+	*/
+	if one.Serial != two.Serial {
+		return false
+	}
+	if one.CertType != two.CertType {
+		return false
+	}
+	if one.KeyId != two.KeyId {
+		return false
+	}
+	if !reflect.DeepEqual(one.ValidPrincipals, two.ValidPrincipals) {
+		return false
+	}
+	if one.ValidAfter != two.ValidAfter {
+		return false
+	}
+	if one.ValidBefore != two.ValidBefore {
+		return false
+	}
+	if !reflect.DeepEqual(one.CriticalOptions, two.CriticalOptions) {
+		return false
+	}
+	if !reflect.DeepEqual(one.Extensions, two.Extensions) {
+		return false
+	}
+	if !bytes.Equal(one.Reserved, two.Reserved) {
+		return false
+	}
+	if !reflect.DeepEqual(one.Key, two.Key) {
+		return false
+	}
+	return true
 }
 
 func newcertRequest() certRequest {
@@ -325,15 +367,7 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 	// request. That is, that an attacker isn't using an old signature to sign a
 	// new/different request id
 	requestedCert := h.state[requestID].request
-	signedCert.SignatureKey = requestedCert.SignatureKey
-	signedCert.Signature = nil
-	requestedCert.Signature = nil
-	// Resetting the Nonce felt wrong. But it turns out that when the signer
-	// signs the request the act of signing generates a new Nonce. So it will
-	// never match.
-	requestedCert.Nonce = []byte("")
-	signedCert.Nonce = []byte("")
-	if !bytes.Equal(requestedCert.Marshal(), signedCert.Marshal()) {
+	if !compareCerts(requestedCert, signedCert) {
 		log.Printf("Signature was valid, but cert didn't match from %s.", req.RemoteAddr)
 		log.Printf("Orig req: %#v\n", requestedCert)
 		log.Printf("Sign req: %#v\n", signedCert)

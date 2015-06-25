@@ -119,3 +119,115 @@ func TestSaveRequestInvalidCert(t *testing.T) {
 		t.Fatalf("Should have failed with fingerprint not in list error.")
 	}
 }
+
+func getTwoBoringCerts(t *testing.T) (*ssh.Certificate, *ssh.Certificate) {
+	pubKeyOne, _, _, _, err := ssh.ParseAuthorizedKey([]byte(boringUserCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	boringCertOne := pubKeyOne.(*ssh.Certificate)
+
+	pubKeyTwo, _, _, _, err := ssh.ParseAuthorizedKey([]byte(boringUserCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	boringCertTwo := pubKeyTwo.(*ssh.Certificate)
+
+	return boringCertOne, boringCertTwo
+}
+
+func TestCompareCertsEasy(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	if !compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should have compared equal.")
+	}
+}
+
+func TestCompareCertsExtendedTime(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.ValidBefore += 1024
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
+
+func TestCompareCertsSerialMismatch(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.Serial = 0
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
+
+func TestCompareCertsTypeMismatch(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.CertType = ssh.HostCert
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
+
+func TestCompareCertsKeyId(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.KeyId = "I'm a liar!"
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
+
+func TestCompareCertsAddInSomeRoot(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.ValidPrincipals = append(boringCertTwo.ValidPrincipals, "root")
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
+
+func TestCompareCertsReplaceWithRoot(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.ValidPrincipals[0] = "root"
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
+
+func TestCompareCertsCriticalOptions(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.CriticalOptions["foobar"] = "we don't use these"
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
+
+func TestCompareCertsExtensions(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.CriticalOptions["environment@cloudtools.github.io"] = "prod"
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
+
+func TestCompareCertsNonce(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertOne.Nonce = []byte("this is nonce one")
+	boringCertTwo.Nonce = []byte("this is nonce two")
+	if !compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should have been equal, we don't compare Nonce.")
+	}
+}
+
+func TestCompareCertsReserved(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.Reserved = []byte("some random garbage")
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
+
+func TestCompareCertsPublicKey(t *testing.T) {
+	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
+	boringCertTwo.Key, _, _, _, _ = ssh.ParseAuthorizedKey([]byte(userPublicKeyString))
+	if compareCerts(boringCertOne, boringCertTwo) {
+		t.Fatalf("Certs should not have been equal.")
+	}
+}
