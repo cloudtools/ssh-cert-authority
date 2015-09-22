@@ -112,17 +112,24 @@ func requestCert(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	pubKeyContents, err := ioutil.ReadFile(config.PublicKeyPath)
-	if err != nil {
-		fmt.Println("Trouble opening your public key file", config.PublicKeyPath, err)
-		os.Exit(1)
+	var chosenKeyFingerprint, pubKeyComment string
+	var pubKey ssh.PublicKey
+	if config.PublicKeyPath != "" {
+		pubKeyContents, err := ioutil.ReadFile(config.PublicKeyPath)
+		if err != nil {
+			fmt.Println("Trouble opening your public key file", config.PublicKeyPath, err)
+			os.Exit(1)
+		}
+		pubKey, pubKeyComment, _, _, err = ssh.ParseAuthorizedKey(pubKeyContents)
+		if err != nil {
+			fmt.Println("Trouble parsing your public key", err)
+			os.Exit(1)
+		}
+		chosenKeyFingerprint = ssh_ca_util.MakeFingerprint(pubKey.Marshal())
+	} else {
+		chosenKeyFingerprint = config.PublicKeyFingerprint
+		pubKeyComment = "unknown"
 	}
-	pubKey, pubKeyComment, _, _, err := ssh.ParseAuthorizedKey(pubKeyContents)
-	if err != nil {
-		fmt.Println("Trouble parsing your public key", err)
-		os.Exit(1)
-	}
-	chosenKeyFingerprint := ssh_ca_util.MakeFingerprint(pubKey.Marshal())
 
 	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
@@ -133,6 +140,13 @@ func requestCert(c *cli.Context) {
 	signer, err := ssh_ca_util.GetSignerForFingerprint(chosenKeyFingerprint, conn)
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
+	}
+	switch signer.PublicKey().Type() {
+	case ssh.KeyAlgoRSA, ssh.KeyAlgoDSA, ssh.KeyAlgoECDSA256, ssh.KeyAlgoECDSA384, ssh.KeyAlgoECDSA521:
+	default:
+		fmt.Println("Unsupported ssh key type:", signer.PublicKey().Type())
+		fmt.Println("We support rsa, dsa and ecdsa. Need golang support for other algorithms.")
 		os.Exit(1)
 	}
 

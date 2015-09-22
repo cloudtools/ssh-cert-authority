@@ -24,11 +24,11 @@ Here's a sample requester config file. The default location for this is
 $HOME/.ssh_ca/requester_config.json ::
     {
         "stage": {
-            "PublicKeyPath": "/Users/bvanzant/.ssh/bvanzant-stage.pub",
+            "PublicKeyFingerprint": "17:04:57:a6:b8:49:94:ab:ca:0f:5e:60:8e:6d:e0:df",
             "SignerUrl": "http://ssh-ca:8080/"
         },
         "prod": {
-            "PublicKeyPath": "/Users/bvanzant/.ssh/bvanzant-prod.pub",
+            "PublicKeyFingerprint": "00:f3:ce:02:e7:63:77:dc:65:be:c5:24:ee:1d:63:c0",
             "SignerUrl": "http://ssh-ca:8080/"
         }
     }

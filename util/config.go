@@ -7,8 +7,9 @@ import (
 )
 
 type RequesterConfig struct {
-	PublicKeyPath string
-	SignerUrl     string
+	PublicKeyPath        string
+	PublicKeyFingerprint string
+	SignerUrl            string
 }
 
 type SignerdConfig struct {
