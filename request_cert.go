@@ -131,6 +131,11 @@ func requestCert(c *cli.Context) {
 		pubKeyComment = "unknown"
 	}
 
+	if chosenKeyFingerprint == "" {
+		fmt.Println("No SSH fingerprint found. Try setting PublicKeyFingerprint in requester config.")
+		os.Exit(1)
+	}
+
 	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		fmt.Println("Dial failed:", err)
