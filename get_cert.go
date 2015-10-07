@@ -121,11 +121,13 @@ func findKeyLocally(key ssh.PublicKey) (string, error) {
 			pubKeyPath := sshDir + "/" + entry.Name()
 			pubBuf, err := ioutil.ReadFile(pubKeyPath)
 			if err != nil {
-				return "", fmt.Errorf("Trouble reading public key %s: %s\n", pubKeyPath, err)
+				fmt.Printf("Trouble reading public key %s: %s\n", pubKeyPath, err)
+				continue
 			}
 			pubKey, _, _, _, err := ssh.ParseAuthorizedKey(pubBuf)
 			if err != nil {
-				return "", fmt.Errorf("Trouble parsing public key %s: %s\n", pubKeyPath, err)
+				fmt.Printf("Trouble parsing public key %s (might be unsupported format): %s\n", pubKeyPath, err)
+				continue
 			}
 			if bytes.Equal(pubKey.Marshal(), key.Marshal()) {
 				return pubKeyPath, nil

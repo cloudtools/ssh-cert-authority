@@ -49,7 +49,7 @@ c2wCh1KaBOotbpXX0zISFvWsDtAAb8/o2A43eRlTA2k=
 const boringUserCertString = "ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgD1NjpHjT+p/i1qgvl9D/kNlm/sbK30K3yQQJrKbI694AAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwEAAAAAAAAAAQAAAAEAAAAIYnZ6LXRlc3QAAAAWAAAABnVidW50dQAAAAhlYzItdXNlcgAAAAAAAAAA//////////8AAAAAAAAAggAAABVwZXJtaXQtWDExLWZvcndhcmRpbmcAAAAAAAAAF3Blcm1pdC1hZ2VudC1mb3J3YXJkaW5nAAAAAAAAABZwZXJtaXQtcG9ydC1mb3J3YXJkaW5nAAAAAAAAAApwZXJtaXQtcHR5AAAAAAAAAA5wZXJtaXQtdXNlci1yYwAAAAAAAAAAAAAAdwAAAAdzc2gtcnNhAAAAAwEAAQAAAGEAukoZeZFLkxqpEnPA9rz9pJbNhqAf3hpYCG9AZzP87CLG8OXFrD6Lq52TdiMJ8DIQhS0/+egs0/Wc1X59uocZ/OijKYO+jXHz+Rp3eunbFx4YjF5wXkva+ij0Hqs1SJ8BAAAAbwAAAAdzc2gtcnNhAAAAYEUiGq8/zcN4UglbHsbU4PwHoAfzQQDkXk41oxYya5Ig858Y4EDf+BzhOOLNoAoTawKyWkTCKRayXpNdRfSFjiraO3a57XRGEJWF4ybgP1leYQ7QlERmmViAHMSxrNpL3Q==  bvanzant@bvz-air.local"
 const signedByInvalidUserCertString = "ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAg9KP0im2yxWQuEQkSGKK9Ym4tb17ZyWs9xSwN0lsU3o4AAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwEAAAAAAAAAAQAAAAEAAAAIYnZ6LXRlc3QAAAAWAAAABnVidW50dQAAAAhlYzItdXNlcgAAAAAAAAAA//////////8AAAAAAAAAggAAABVwZXJtaXQtWDExLWZvcndhcmRpbmcAAAAAAAAAF3Blcm1pdC1hZ2VudC1mb3J3YXJkaW5nAAAAAAAAABZwZXJtaXQtcG9ydC1mb3J3YXJkaW5nAAAAAAAAAApwZXJtaXQtcHR5AAAAAAAAAA5wZXJtaXQtdXNlci1yYwAAAAAAAAAAAAAAdwAAAAdzc2gtcnNhAAAAAwEAAQAAAGEAwXRxAT37T9wmGZrN/LNP9ToHM0dFFkgZrG5KE9cC9DxRtzlpG4ixPM1LnteRJmowP9VZW2TwoWwBfFG//WaXTP5c07+b9HBfMUpcOaFzmRJyKUmA+jPTm6E7N3+R8l35AAAAbwAAAAdzc2gtcnNhAAAAYGuA1rEVeDacEoKSFHlxpD85O7ueBWHm8zRdmqc/txt88FnFKlb/cBFkL//8P5mB5WbjWGSnOXokUqj9Xf5gaIb1jfWzWql3HoYomlkyVGcI+g+lMq1w6/rI7lTcpEAjaw==  bvanzant@bvz-air.local"
 
-func SetupSignerdConfig() map[string]ssh_ca_util.SignerdConfig {
+func SetupSignerdConfig(numSignersRequired int) map[string]ssh_ca_util.SignerdConfig {
 	config := make(map[string]ssh_ca_util.SignerdConfig)
 	config["testing"] = ssh_ca_util.SignerdConfig{
 		SigningKeyFingerprint: "4c:c6:1e:31:ed:7b:7c:33:ff:7d:51:9e:59:da:68:f5",
@@ -59,13 +59,71 @@ func SetupSignerdConfig() map[string]ssh_ca_util.SignerdConfig {
 		AuthorizedSigners: map[string]string{
 			"23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4": "test-signer",
 		},
-		NumberSignersRequired: 1,
+		NumberSignersRequired: numSignersRequired,
 	}
 	return config
 }
 
+func TestRejectRequest(t *testing.T) {
+	allConfig := SetupSignerdConfig(1)
+	environment := "testing"
+	envConfig := allConfig[environment]
+	requestHandler := makeCertRequestHandler(allConfig)
+
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(boringUserCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	cert := pubKey.(*ssh.Certificate)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	if err != nil {
+		t.Fatalf("Should have succeeded. Failed with: %v", err)
+	}
+
+	err = requestHandler.rejectRequest("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig)
+	if err != nil {
+		t.Fatalf("Should have succeeded. Failed with: %v", err)
+	}
+	err = requestHandler.addConfirmation("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig, false)
+	if err == nil {
+		t.Fatalf("Sign after reject should fail.")
+	}
+}
+
+func TestRejectRequestAfterSigning(t *testing.T) {
+	allConfig := SetupSignerdConfig(2)
+	environment := "testing"
+	envConfig := allConfig[environment]
+	requestHandler := makeCertRequestHandler(allConfig)
+
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(boringUserCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	cert := pubKey.(*ssh.Certificate)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	if err != nil {
+		t.Fatalf("Should have succeeded. Failed with: %v", err)
+	}
+
+	err = requestHandler.addConfirmation("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig, false)
+	if err != nil {
+		t.Fatalf("Sign should have worked. It failed: %v", err)
+	}
+
+	err = requestHandler.rejectRequest("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig)
+	if err != nil {
+		t.Fatalf("Should have succeeded. Failed with: %v", err)
+	}
+
+	err = requestHandler.addConfirmation("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig, false)
+	if err == nil {
+		t.Fatalf("Sign after reject should fail.")
+	}
+}
+
 func TestSaveRequestValidCert(t *testing.T) {
-	allConfig := SetupSignerdConfig()
+	allConfig := SetupSignerdConfig(1)
 	environment := "testing"
 	envConfig := allConfig[environment]
 	requestHandler := makeCertRequestHandler(allConfig)
@@ -104,7 +162,7 @@ func TestSaveRequestValidCert(t *testing.T) {
 }
 
 func TestSaveRequestInvalidCert(t *testing.T) {
-	allConfig := SetupSignerdConfig()
+	allConfig := SetupSignerdConfig(1)
 	environment := "testing"
 	envConfig := allConfig[environment]
 	requestHandler := makeCertRequestHandler(allConfig)

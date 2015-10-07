@@ -112,7 +112,7 @@ id. You then sign it by::
       Permissions: map[permit-agent-forwarding: permit-port-forwarding: permit-pty:]
       Valid for public key: 1c:fd:36:27:db:48:3f:ad:e2:fe:55:45:67:b1:47:99
       Valid from 2015-03-31 08:21:39 -0700 PDT - 2015-03-31 10:21:39 -0700 PDT
-    Type 'yes' if you'd like to sign this cert request
+    Type 'yes' if you'd like to sign this cert request, 'reject' to reject it, anything else to cancel
 
 Inspect every field and compare it to what you know about who is requesting
 this certificate and why. I'll provide a brief explanation of these here
@@ -136,8 +136,14 @@ is to be abused. sign_cert will print out the expiry time of a
 certificate in red if the value is more than 48 hours in the future.
 
 If you, as a signer, are happy with the certificate request you can type
-`yes` and the certificate will be, effectively, +1'ed by you. Any other
-input is ignored and sign_cert exits.
+`yes` and the certificate will be, effectively, +1'ed by you.
+
+If you believe this request is a Bad Idea and should not be approved by
+anyone you can reject it forcefully and authoritatively by typing
+`reject`. This will permanently mark the request as rejected and it can
+never be signed after that.
+
+Any other input is ignored and sign_cert exits.
 
 In order for sign_cert to run your SSH key must be loaded in ssh-agent
 (via ssh-add). Otherwise sign_cert will exit with an error::

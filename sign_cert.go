@@ -18,6 +18,13 @@ import (
 	"strings"
 )
 
+type OperationKind string
+
+const (
+	OperationApprove OperationKind = "approve"
+	OperationReject  OperationKind = "reject"
+)
+
 func signCertFlags() []cli.Flag {
 	home := os.Getenv("HOME")
 	if home == "" {
@@ -121,12 +128,18 @@ func signCert(c *cli.Context) {
 	}
 	cert := *pubKey.(*ssh.Certificate)
 	ssh_ca_util.PrintForInspection(cert)
-	fmt.Printf("Type 'yes' if you'd like to sign this cert request ")
+	fmt.Printf("Type 'yes' if you'd like to sign this cert request, 'reject' to reject it, anything else to cancel ")
 	reader := bufio.NewReader(os.Stdin)
 	text, _ := reader.ReadString('\n')
 	text = strings.TrimSpace(text)
-	if text != "yes" && text != "YES" {
+	if text != "yes" && text != "reject" {
 		os.Exit(0)
+	}
+	var operation OperationKind
+	if text == "yes" {
+		operation = OperationApprove
+	} else {
+		operation = OperationReject
 	}
 
 	err = cert.SignCert(rand.Reader, signer)
@@ -137,7 +150,11 @@ func signCert(c *cli.Context) {
 
 	request := ssh_ca_client.MakeSigningRequest(cert, certRequestID, config)
 	requestWebParameters := request.BuildWebRequest()
-	err = request.PostToWeb(requestWebParameters)
+	if operation == OperationApprove {
+		err = request.PostToWeb(requestWebParameters)
+	} else {
+		err = request.DeleteToWeb(requestWebParameters)
+	}
 	if err != nil {
 		fmt.Println("Error sending in +1:", err)
 		os.Exit(1)
