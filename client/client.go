@@ -65,6 +65,27 @@ func (req *SigningRequest) PostToWeb(requestParameters url.Values) error {
 	}
 }
 
+func (req *SigningRequest) DeleteToWeb(requestParameters url.Values) error {
+	var client http.Client
+	encodedParameters := requestParameters.Encode()
+	request, err := http.NewRequest("DELETE", req.config.SignerUrl+"cert/requests/"+req.requestID+"?"+encodedParameters, nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	resp, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		respBuf, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %d: %s", resp.Status, string(respBuf))
+	} else {
+		return nil
+	}
+}
+
 func (req *CertRequest) SetConfig(config ssh_ca_util.RequesterConfig) error {
 	if config.SignerUrl == "" {
 		return fmt.Errorf("Signer URL is empty. This isn't going to work")
@@ -184,6 +205,9 @@ type SlackWebhookInput struct {
 }
 
 func PostToSlack(slackUrl, slackChannel, msg string) error {
+	if slackUrl == "" || slackChannel == "" {
+		return nil
+	}
 	var webhookInput SlackWebhookInput
 	webhookInput.Text = msg
 	if slackChannel != "" {

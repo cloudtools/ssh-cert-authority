@@ -27,12 +27,13 @@ import (
 type certRequest struct {
 	// This struct tracks state for certificate requests. Imagine this one day
 	// being stored in a persistent data store.
-	request     *ssh.Certificate
-	submitTime  time.Time
-	environment string
-	signatures  map[string]bool
-	certSigned  bool
-	reason      string
+	request      *ssh.Certificate
+	submitTime   time.Time
+	environment  string
+	signatures   map[string]bool
+	certSigned   bool
+	certRejected bool
+	reason       string
 }
 
 func compareCerts(one, two *ssh.Certificate) bool {
@@ -205,12 +206,12 @@ func (h *certRequestHandler) saveSigningRequest(config ssh_ca_util.SignerdConfig
 
 func (h *certRequestHandler) extractCertFromRequest(req *http.Request) (*ssh.Certificate, error) {
 
-	if req.PostForm["cert"] == nil || len(req.PostForm["cert"]) == 0 {
+	if req.Form["cert"] == nil || len(req.Form["cert"]) == 0 {
 		err := errors.New("Please specify exactly one cert request")
 		return nil, err
 	}
 
-	rawCertRequest, err := base64.StdEncoding.DecodeString(req.PostForm["cert"][0])
+	rawCertRequest, err := base64.StdEncoding.DecodeString(req.Form["cert"][0])
 	if err != nil {
 		err := errors.New("Unable to base64 decode cert request")
 		return nil, err
@@ -310,21 +311,23 @@ func (h *certRequestHandler) getRequestStatus(rw http.ResponseWriter, req *http.
 	requestID := uriVars["requestID"]
 
 	type Response struct {
-		certSigned bool
-		cert       string
+		certSigned   bool
+		certRejected bool
+		cert         string
 	}
-	if h.state[requestID].certSigned == true {
+	if h.state[requestID].certSigned {
 		rw.Write([]byte(h.state[requestID].request.Type()))
 		rw.Write([]byte(" "))
 		rw.Write([]byte(base64.StdEncoding.EncodeToString(h.state[requestID].request.Marshal())))
 		rw.Write([]byte("\n"))
+	} else if h.state[requestID].certRejected {
+		http.Error(rw, "Cert request was rejected.", http.StatusPreconditionFailed)
 	} else {
 		http.Error(rw, "Cert not signed yet.", http.StatusPreconditionFailed)
 	}
 }
 
-func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Request) {
-
+func (h *certRequestHandler) signOrRejectRequest(rw http.ResponseWriter, req *http.Request) {
 	requestID := mux.Vars(req)["requestID"]
 	originalRequest, ok := h.state[requestID]
 	if !ok {
@@ -333,6 +336,10 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 	}
 	if originalRequest.certSigned {
 		http.Error(rw, "Request already signed.", http.StatusConflict)
+		return
+	}
+	if originalRequest.certRejected {
+		http.Error(rw, "Request already rejected.", http.StatusConflict)
 		return
 	}
 
@@ -374,27 +381,65 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 		http.Error(rw, "Signature was valid, but cert didn't match.", http.StatusBadRequest)
 		return
 	}
-
-	h.state[requestID].signatures[signerFp] = true
 	log.Printf("Signature for serial %d id %s received from %s (%s) @ %s and determined valid\n",
 		signedCert.Serial, requestID, signerFp, envConfig.AuthorizedSigners[signerFp], req.RemoteAddr)
+	if req.Method == "POST" {
+		err = h.addConfirmation(requestID, signerFp, envConfig, true)
+	} else {
+		err = h.rejectRequest(requestID, signerFp, envConfig)
+	}
+	if err != nil {
+		http.Error(rw, fmt.Sprintf("%v", err), http.StatusNotFound)
+	}
+}
+
+func (h *certRequestHandler) rejectRequest(requestID string, signerFp string, envConfig ssh_ca_util.SignerdConfig) error {
+	log.Printf("Reject received for id %s", requestID)
+	stateInfo := h.state[requestID]
+	stateInfo.certRejected = true
+	// this is weird. see: https://code.google.com/p/go/issues/detail?id=3117
+	h.state[requestID] = stateInfo
+	return nil
+}
+
+func (h *certRequestHandler) addConfirmation(requestID string, signerFp string, envConfig ssh_ca_util.SignerdConfig, actuallySign bool) error {
+	if h.state[requestID].certRejected {
+		return fmt.Errorf("Attempt to sign a rejected cert.")
+	}
+	h.state[requestID].signatures[signerFp] = true
 
 	if envConfig.SlackUrl != "" {
 		slackMsg := fmt.Sprintf("SSH cert %s signed by %s making %d/%d signatures.",
-			requestID, envConfig.AuthorizedSigners[signerFp], len(h.state[requestID].signatures), envConfig.NumberSignersRequired)
-		err = ssh_ca_client.PostToSlack(envConfig.SlackUrl, envConfig.SlackChannel, slackMsg)
+			requestID, envConfig.AuthorizedSigners[signerFp],
+			len(h.state[requestID].signatures), envConfig.NumberSignersRequired)
+		err := ssh_ca_client.PostToSlack(envConfig.SlackUrl, envConfig.SlackChannel, slackMsg)
 		if err != nil {
 			log.Printf("Unable to post to slack for %s: %v", requestID, err)
 		}
 	}
+	signed, err := h.maybeSignWithCa(requestID, envConfig.NumberSignersRequired, envConfig.SigningKeyFingerprint, actuallySign)
+	if signed && err == nil {
+		slackMsg := fmt.Sprintf("SSH cert request %s fully signed.", requestID)
+		err := ssh_ca_client.PostToSlack(envConfig.SlackUrl, envConfig.SlackChannel, slackMsg)
+		if err != nil {
+			log.Printf("Unable to post to slack for %s: %v", requestID, err)
+		}
+	}
+	return err
+}
 
-	if len(h.state[requestID].signatures) >= envConfig.NumberSignersRequired {
+func (h *certRequestHandler) maybeSignWithCa(requestID string, numSignersRequired int, signingKeyFingerprint string, actuallySign bool) (bool, error) {
+	if len(h.state[requestID].signatures) >= numSignersRequired {
+		if !actuallySign {
+			// This is used for testing. We're effectively disabling working
+			// with the ssh agent to avoid needing to mock it.
+			return true, nil
+		}
 		log.Printf("Received %d signatures for %s, signing now.\n", len(h.state[requestID].signatures), requestID)
-		signer, err := ssh_ca_util.GetSignerForFingerprint(envConfig.SigningKeyFingerprint, h.sshAgentConn)
+		signer, err := ssh_ca_util.GetSignerForFingerprint(signingKeyFingerprint, h.sshAgentConn)
 		if err != nil {
 			log.Printf("Couldn't find signing key for request %s, unable to sign request\n", requestID)
-			http.Error(rw, "Couldn't find signing key, unable to sign. Sorry.", http.StatusNotFound)
-			return
+			return false, fmt.Errorf("Couldn't find signing key, unable to sign. Sorry.")
 		}
 		stateInfo := h.state[requestID]
 		for extensionName := range stateInfo.request.Extensions {
@@ -412,14 +457,9 @@ func (h *certRequestHandler) signRequest(rw http.ResponseWriter, req *http.Reque
 		stateInfo.certSigned = true
 		// this is weird. see: https://code.google.com/p/go/issues/detail?id=3117
 		h.state[requestID] = stateInfo
-		if envConfig.SlackUrl != "" {
-			slackMsg := fmt.Sprintf("SSH cert request %s fully signed.", requestID)
-			err = ssh_ca_client.PostToSlack(envConfig.SlackUrl, envConfig.SlackChannel, slackMsg)
-			if err != nil {
-				log.Printf("Unable to post to slack for %s: %v", requestID, err)
-			}
-		}
+		return true, nil
 	}
+	return false, nil
 }
 
 func signdFlags() []cli.Flag {
@@ -482,6 +522,6 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) {
 	requests.Methods("GET").HandlerFunc(requestHandler.listPendingRequests)
 	request := r.Path("/cert/requests/{requestID}").Subrouter()
 	request.Methods("GET").HandlerFunc(requestHandler.getRequestStatus)
-	request.Methods("POST").HandlerFunc(requestHandler.signRequest)
+	request.Methods("POST", "DELETE").HandlerFunc(requestHandler.signOrRejectRequest)
 	http.ListenAndServe(":8080", r)
 }
