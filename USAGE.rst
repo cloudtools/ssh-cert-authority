@@ -19,7 +19,7 @@ example you might have separate environments for staging and production
 each with different CAs. This tool supports that.
 
 Here's a sample requester config file. The default location for this is
-`$HOME/.ssh_ca/requester_config.json` ::
+``$HOME/.ssh_ca/requester_config.json`` ::
     {
         "stage": {
             "PublicKeyFingerprint": "17:04:57:a6:b8:49:94:ab:ca:0f:5e:60:8e:6d:e0:df",
@@ -34,7 +34,7 @@ Here's a sample requester config file. The default location for this is
 The contents should be reasonably self explanatory. Here we have a json
 blob containing a stage and prod environment. The user has chosen to use
 different SSH keys for production and staging, however, this is not
-required. The `SignerUrl` is the location of the ssh-cert-authority daemon.
+required. The ``SignerUrl`` is the location of the ssh-cert-authority daemon.
 
 Making a request
 ----------------
@@ -50,15 +50,15 @@ This will print out a certificate request id like so::
 Hand this id off to someone that can sign your cert.
 
 If instead you got an error like
-`ssh-add the private half of the key you want to use.` then go do that.
-Under the hood the `request_cert` command is going to use your SSH
+``ssh-add the private half of the key you want to use.`` then go do that.
+Under the hood the ``request`` command is going to use your SSH
 private key to sign your certificate request. This is how the signing
 daemon knows that you are the person that actually requested the cert
 (you have control of the private key and your private key is actually
-private, right?). This is typically as simple as `ssh-add ~/.ssh/id_rsa`
+private, right?). This is typically as simple as ``ssh-add ~/.ssh/id_rsa``
 but if you've got lots of keys or per-environment config you'll need to
 adjust and ensure you both add the right key and that your
-`requester_config.json` is specifying the right public key.
+``requester_config.json`` is specifying the right public key.
 
 Signing certificates
 ====================
@@ -71,7 +71,7 @@ Configuration
 -------------
 
 A sample signer config. By default this is in
-`$HOME/.ssh_ca/signer_config.json` ::
+``$HOME/.ssh_ca/signer_config.json`` ::
 
     {
         "stage": {
@@ -87,8 +87,8 @@ A sample signer config. By default this is in
 In this case the configuration is slightly different from requesting
 because we're dealing with fingerprints instead of paths. You can easily
 get the fingerprint of the private key you want to sign with by doing
-`ssh-keygen -l -f ~/.ssh/id_rsa` or inspecting the output of `ssh-add
--l` (the `ssh-add -l` output is only relevant if your private key is
+``ssh-keygen -l -f ~/.ssh/id_rsa`` or inspecting the output of ``ssh-add
+-l`` (the ``ssh-add -l`` output is only relevant if your private key is
 loaded in your agent).
 
 Signing a request
@@ -113,18 +113,18 @@ id. You then sign it by::
 
 Inspect every field and compare it to what you know about who is requesting
 this certificate and why. I'll provide a brief explanation of these here
-but for more information checkout the `CERTIFICATES` section of
-`ssh-keygen(1)`
+but for more information checkout the ``CERTIFICATES`` section of
+``ssh-keygen(1)``
 
     - Does the key id match with who requested the cert?
     - Principals specifies the list of usernames that a requester can
       use to login to systems as. In our example here the user is
-      allowed to use `ec2-user` and `ubuntu`.
+      allowed to use ``ec2-user`` and ``ubuntu``.
     - Permissions is a list of ssh permissions that this cert grants. In
-      particular `permit-pty` will allow the user to open up a shell. Here
-      we also see `permit-agent-forwarding` which allows the user to
-      forward along their `ssh-agent` connection (generally useful) and
-      `permit-port-forwarding` which allows the user of this cert to
+      particular ``permit-pty`` will allow the user to open up a shell. Here
+      we also see ``permit-agent-forwarding`` which allows the user to
+      forward along their ``ssh-agent`` connection (generally useful) and
+      ``permit-port-forwarding`` which allows the user of this cert to
       forward ports along connections.
 
 Also inspect the validity period. What is normal for your organization?
@@ -133,17 +133,17 @@ is to be abused. sign_cert will print out the expiry time of a
 certificate in red if the value is more than 48 hours in the future.
 
 If you, as a signer, are happy with the certificate request you can type
-`yes` and the certificate will be, effectively, +1'ed by you.
+``yes`` and the certificate will be, effectively, +1'ed by you.
 
 If you believe this request is a Bad Idea and should not be approved by
 anyone you can reject it forcefully and authoritatively by typing
-`reject`. This will permanently mark the request as rejected and it can
+``reject``. This will permanently mark the request as rejected and it can
 never be signed after that.
 
 Any other input is ignored and sign_cert exits.
 
-In order for sign_cert to run your SSH key must be loaded in `ssh-agent`
-(via `ssh-add`). Otherwise `sign` will exit with an error::
+In order for sign_cert to run your SSH key must be loaded in ``ssh-agent``
+(via ``ssh-add``). Otherwise ``sign`` will exit with an error::
 
   ssh-add the private half of the key you want to use.
 
@@ -157,6 +157,6 @@ Super basic
 Configuration
 -------------
 
-The get command uses the `requester_config.json` file described under
+The get command uses the ``requester_config.json`` file described under
 requesting a certificate.
 
