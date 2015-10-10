@@ -19,6 +19,7 @@ type SignerdConfig struct {
 	NumberSignersRequired int
 	SlackUrl              string
 	SlackChannel          string
+	MaxCertLifetime       int
 }
 
 type SignerConfig struct {

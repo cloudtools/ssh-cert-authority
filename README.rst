@@ -249,6 +249,7 @@ environment might be::
     {
       "production": {
             "NumberSignersRequired": 1,
+            "MaxCertLifetime": 86400,
             "SigningKeyFingerprint": "66:b5:be:e5:7e:09:3f:98:97:36:9b:64:ec:ea:3a:fe",
             "AuthorizedSigners": {
                 "66:b5:be:e5:7e:09:3f:98:97:36:9b:64:ec:ea:3a:fe": "bvz"
@@ -264,6 +265,7 @@ Effectively the format is::
     {
         "environment name": {
             NumberSignersRequired
+            MaxCertLifetime
             SigningKeyFingerprint
             AuthorizedSigners {
                 <key fingerprint>: <key identity>
@@ -275,6 +277,10 @@ Effectively the format is::
 
 - NumberSignersRequired: The number of people that must sign a request
   before the request is considered complete and signed by the authority.
+- MaxCertLifetime: The maximum duration certificate, measured from Now()
+  in seconds, that is permitted. The default is 0, meaning unlimited. A
+  value of 86400 would mean that the server will reject requests for
+  certificates that are valid for more than 1 day.
 - SigningKeyFingerprint: The fingerprint of the key that will be used to
   sign complete requests.
 - AuthorizedSigners: A hash keyed by key fingerprints and values of key

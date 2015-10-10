@@ -7,8 +7,8 @@ import (
 )
 
 // 768 bit key to try to keep the paste as small as possible
-const userPublicKeyString = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAYQDQ0aYhDW5wP8rVBIpXiCTiKw33/nI1mAti3EoX/zRYWtP2XMBePqnf2w2V+z5FEJm8hFSDpb8DtRBNonGEceuTn5CNjfNpDIJ7H3OOa8mP0CBiJY9A9Oopwn/hsRLy0vk= user-key"
-const signerPublicKeyString = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwE= signer-key"
+const signerPublicKeyString = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAYQDQ0aYhDW5wP8rVBIpXiCTiKw33/nI1mAti3EoX/zRYWtP2XMBePqnf2w2V+z5FEJm8hFSDpb8DtRBNonGEceuTn5CNjfNpDIJ7H3OOa8mP0CBiJY9A9Oopwn/hsRLy0vk= user-key"
+const userPublicKeyString = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwE= signer-key"
 const caPublicKeyString = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAYQDBdHEBPftP3CYZms38s0/1OgczR0UWSBmsbkoT1wL0PFG3OWkbiLE8zUue15EmajA/1VlbZPChbAF8Ub/9ZpdM/lzTv5v0cF8xSlw5oXOZEnIpSYD6M9OboTs3f5HyXfk= ca-key"
 const caPrivateKeyString = `-----BEGIN RSA PRIVATE KEY-----
 MIIBygIBAAJhAMF0cQE9+0/cJhmazfyzT/U6BzNHRRZIGaxuShPXAvQ8Ubc5aRuI
@@ -48,8 +48,10 @@ c2wCh1KaBOotbpXX0zISFvWsDtAAb8/o2A43eRlTA2k=
 -----END RSA PRIVATE KEY-----`
 const boringUserCertString = "ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgD1NjpHjT+p/i1qgvl9D/kNlm/sbK30K3yQQJrKbI694AAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwEAAAAAAAAAAQAAAAEAAAAIYnZ6LXRlc3QAAAAWAAAABnVidW50dQAAAAhlYzItdXNlcgAAAAAAAAAA//////////8AAAAAAAAAggAAABVwZXJtaXQtWDExLWZvcndhcmRpbmcAAAAAAAAAF3Blcm1pdC1hZ2VudC1mb3J3YXJkaW5nAAAAAAAAABZwZXJtaXQtcG9ydC1mb3J3YXJkaW5nAAAAAAAAAApwZXJtaXQtcHR5AAAAAAAAAA5wZXJtaXQtdXNlci1yYwAAAAAAAAAAAAAAdwAAAAdzc2gtcnNhAAAAAwEAAQAAAGEAukoZeZFLkxqpEnPA9rz9pJbNhqAf3hpYCG9AZzP87CLG8OXFrD6Lq52TdiMJ8DIQhS0/+egs0/Wc1X59uocZ/OijKYO+jXHz+Rp3eunbFx4YjF5wXkva+ij0Hqs1SJ8BAAAAbwAAAAdzc2gtcnNhAAAAYEUiGq8/zcN4UglbHsbU4PwHoAfzQQDkXk41oxYya5Ig858Y4EDf+BzhOOLNoAoTawKyWkTCKRayXpNdRfSFjiraO3a57XRGEJWF4ybgP1leYQ7QlERmmViAHMSxrNpL3Q==  bvanzant@bvz-air.local"
 const signedByInvalidUserCertString = "ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAg9KP0im2yxWQuEQkSGKK9Ym4tb17ZyWs9xSwN0lsU3o4AAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwEAAAAAAAAAAQAAAAEAAAAIYnZ6LXRlc3QAAAAWAAAABnVidW50dQAAAAhlYzItdXNlcgAAAAAAAAAA//////////8AAAAAAAAAggAAABVwZXJtaXQtWDExLWZvcndhcmRpbmcAAAAAAAAAF3Blcm1pdC1hZ2VudC1mb3J3YXJkaW5nAAAAAAAAABZwZXJtaXQtcG9ydC1mb3J3YXJkaW5nAAAAAAAAAApwZXJtaXQtcHR5AAAAAAAAAA5wZXJtaXQtdXNlci1yYwAAAAAAAAAAAAAAdwAAAAdzc2gtcnNhAAAAAwEAAQAAAGEAwXRxAT37T9wmGZrN/LNP9ToHM0dFFkgZrG5KE9cC9DxRtzlpG4ixPM1LnteRJmowP9VZW2TwoWwBfFG//WaXTP5c07+b9HBfMUpcOaFzmRJyKUmA+jPTm6E7N3+R8l35AAAAbwAAAAdzc2gtcnNhAAAAYGuA1rEVeDacEoKSFHlxpD85O7ueBWHm8zRdmqc/txt88FnFKlb/cBFkL//8P5mB5WbjWGSnOXokUqj9Xf5gaIb1jfWzWql3HoYomlkyVGcI+g+lMq1w6/rI7lTcpEAjaw==  bvanzant@bvz-air.local"
+const foreverUserCertString = "ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgOQ95vOpIs7uJPiJ1VikwGbmf7LZWFCkD4SYzP9XEvrkAAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwEAAAAAAAAAAAAAAAEAAAANdGVzdGZhcmZ1dHVyZQAAAAoAAAAGdWJ1bnR1AAAAAAAAAAD//////////wAAAAAAAACCAAAAFXBlcm1pdC1YMTEtZm9yd2FyZGluZwAAAAAAAAAXcGVybWl0LWFnZW50LWZvcndhcmRpbmcAAAAAAAAAFnBlcm1pdC1wb3J0LWZvcndhcmRpbmcAAAAAAAAACnBlcm1pdC1wdHkAAAAAAAAADnBlcm1pdC11c2VyLXJjAAAAAAAAAAAAAAB3AAAAB3NzaC1yc2EAAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwEAAABvAAAAB3NzaC1yc2EAAABgrLrgF1y6t1s0APpKi2JcBDI9OhtsIa7SLaTvRrhAmXc+0OQPlgtmqp581Mwnpv+cuJpoPurO3cQpfzT+XDnRZdoEOBz9wTzkbb6tqQ/O+Ltf5ss5cyKd0GHgGCzUVYB7 user-key"
+const twentyTwentyFiveCertString = "ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgFJu+SQd43RC/DZjYXtsiSAZslugnFX0LQV44bQL5XlgAAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwEAAAAAAAAAAAAAAAEAAAANdGVzdGZhcmZ1dHVyZQAAAAoAAAAGdWJ1bnR1AAAAAFYW52AAAAAAaOLqwgAAAAAAAACCAAAAFXBlcm1pdC1YMTEtZm9yd2FyZGluZwAAAAAAAAAXcGVybWl0LWFnZW50LWZvcndhcmRpbmcAAAAAAAAAFnBlcm1pdC1wb3J0LWZvcndhcmRpbmcAAAAAAAAACnBlcm1pdC1wdHkAAAAAAAAADnBlcm1pdC11c2VyLXJjAAAAAAAAAAAAAAB3AAAAB3NzaC1yc2EAAAADAQABAAAAYQC6Shl5kUuTGqkSc8D2vP2kls2GoB/eGlgIb0BnM/zsIsbw5cWsPournZN2IwnwMhCFLT/56CzT9ZzVfn26hxn86KMpg76NcfP5Gnd66dsXHhiMXnBeS9r6KPQeqzVInwEAAABvAAAAB3NzaC1yc2EAAABgHPStnlKu6jr8bI0LG3LwwWczyLU56rMozAngOo6ovCAMqXtWZ5GvfUZf+Ok+B+6usJrMZQqrE+OhdC+GVWqzee9nH9Wy1n8ACbGVWJtN63iJxqrMqOnLVvSrd7s7tPqv user-key"
 
-func SetupSignerdConfig(numSignersRequired int) map[string]ssh_ca_util.SignerdConfig {
+func SetupSignerdConfig(numSignersRequired, maxCertLifetime int) map[string]ssh_ca_util.SignerdConfig {
 	config := make(map[string]ssh_ca_util.SignerdConfig)
 	config["testing"] = ssh_ca_util.SignerdConfig{
 		SigningKeyFingerprint: "4c:c6:1e:31:ed:7b:7c:33:ff:7d:51:9e:59:da:68:f5",
@@ -60,12 +62,13 @@ func SetupSignerdConfig(numSignersRequired int) map[string]ssh_ca_util.SignerdCo
 			"23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4": "test-signer",
 		},
 		NumberSignersRequired: numSignersRequired,
+		MaxCertLifetime:       maxCertLifetime,
 	}
 	return config
 }
 
 func TestRejectRequest(t *testing.T) {
-	allConfig := SetupSignerdConfig(1)
+	allConfig := SetupSignerdConfig(1, 0)
 	environment := "testing"
 	envConfig := allConfig[environment]
 	requestHandler := makeCertRequestHandler(allConfig)
@@ -91,7 +94,7 @@ func TestRejectRequest(t *testing.T) {
 }
 
 func TestRejectRequestAfterSigning(t *testing.T) {
-	allConfig := SetupSignerdConfig(2)
+	allConfig := SetupSignerdConfig(2, 0)
 	environment := "testing"
 	envConfig := allConfig[environment]
 	requestHandler := makeCertRequestHandler(allConfig)
@@ -122,8 +125,62 @@ func TestRejectRequestAfterSigning(t *testing.T) {
 	}
 }
 
+func TestSaveForeverCertDisallowed(t *testing.T) {
+	allConfig := SetupSignerdConfig(1, 14400)
+	environment := "testing"
+	envConfig := allConfig[environment]
+	requestHandler := makeCertRequestHandler(allConfig)
+
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(foreverUserCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	cert := pubKey.(*ssh.Certificate)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	if err == nil {
+		t.Fatalf("Should have failed because cert never expires.")
+	}
+
+	pubKey, _, _, _, err = ssh.ParseAuthorizedKey([]byte(twentyTwentyFiveCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	cert = pubKey.(*ssh.Certificate)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	if err == nil {
+		t.Fatalf("Should have failed because cert expires in 2025.")
+	}
+}
+
+func TestSaveForeverCertAllowed(t *testing.T) {
+	allConfig := SetupSignerdConfig(1, 0)
+	environment := "testing"
+	envConfig := allConfig[environment]
+	requestHandler := makeCertRequestHandler(allConfig)
+
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(foreverUserCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	cert := pubKey.(*ssh.Certificate)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	if err != nil {
+		t.Fatalf("Should have worked, failed with: %v", err)
+	}
+
+	pubKey, _, _, _, err = ssh.ParseAuthorizedKey([]byte(twentyTwentyFiveCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	cert = pubKey.(*ssh.Certificate)
+	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF2", 1, cert)
+	if err != nil {
+		t.Fatalf("Should have worked, failed with: %v", err)
+	}
+}
+
 func TestSaveRequestValidCert(t *testing.T) {
-	allConfig := SetupSignerdConfig(1)
+	allConfig := SetupSignerdConfig(1, 0)
 	environment := "testing"
 	envConfig := allConfig[environment]
 	requestHandler := makeCertRequestHandler(allConfig)
@@ -162,7 +219,7 @@ func TestSaveRequestValidCert(t *testing.T) {
 }
 
 func TestSaveRequestInvalidCert(t *testing.T) {
-	allConfig := SetupSignerdConfig(1)
+	allConfig := SetupSignerdConfig(1, 0)
 	environment := "testing"
 	envConfig := allConfig[environment]
 	requestHandler := makeCertRequestHandler(allConfig)
@@ -284,7 +341,7 @@ func TestCompareCertsReserved(t *testing.T) {
 
 func TestCompareCertsPublicKey(t *testing.T) {
 	boringCertOne, boringCertTwo := getTwoBoringCerts(t)
-	boringCertTwo.Key, _, _, _, _ = ssh.ParseAuthorizedKey([]byte(userPublicKeyString))
+	boringCertTwo.Key, _, _, _, _ = ssh.ParseAuthorizedKey([]byte(signerPublicKeyString))
 	if compareCerts(boringCertOne, boringCertTwo) {
 		t.Fatalf("Certs should not have been equal.")
 	}
