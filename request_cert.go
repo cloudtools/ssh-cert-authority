@@ -178,6 +178,7 @@ func requestCert(c *cli.Context) {
 		}
 	} else {
 		fmt.Println(err)
+		os.Exit(1)
 	}
 
 }
