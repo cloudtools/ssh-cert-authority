@@ -236,8 +236,8 @@ environment and a production environment. Throughout the examples we
 assume a single environment named "production."
 
 In all cases this tool relies heavily on ``ssh-agent``. It is entirely
-feasible that ``ssh-agent`` could be replaced by any other process cable of
-signing a blob of data with a specified key including an HSM.
+feasible that ``ssh-agent`` could be replaced by any other process capable
+of signing a blob of data with a specified key including an HSM.
 
 Many of the configuration files use SSH key fingerprints. To get a key's
 fingerprint you may run ``ssh-keygen -l -f <filename>`` or, if the key is
