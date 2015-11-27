@@ -282,6 +282,9 @@ Effectively the format is::
 
 - ``NumberSignersRequired``: The number of people that must sign a request
   before the request is considered complete and signed by the authority.
+  If this field is < 0 valid certificate requests will be automatically
+  signed at request time. It is highly recommended that if auto signing
+  is enabled a ``MaxCertLifetime`` be specified.
 - ``MaxCertLifetime``: The maximum duration certificate, measured from Now()
   in seconds, that is permitted. The default is 0, meaning unlimited. A
   value of 86400 would mean that the server will reject requests for

@@ -140,7 +140,7 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 	requestIDStr := base32.StdEncoding.EncodeToString(requestID)
 	nextSerial := <-h.NextSerial
 
-	err = h.saveSigningRequest(config, environment, reason, requestIDStr, nextSerial, cert)
+	signed, err := h.saveSigningRequest(config, environment, reason, requestIDStr, nextSerial, cert)
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("Request not made: %v", err), http.StatusBadRequest)
 		return
@@ -150,8 +150,6 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 	log.Printf("Cert request serial %d id %s env %s from %s (%s) @ %s principals %v valid from %d to %d for '%s'\n",
 		cert.Serial, requestIDStr, environment, requesterFp, config.AuthorizedUsers[requesterFp],
 		req.RemoteAddr, cert.ValidPrincipals, cert.ValidAfter, cert.ValidBefore, reason)
-	rw.WriteHeader(http.StatusCreated)
-	rw.Write([]byte(requestIDStr))
 
 	if config.SlackUrl != "" {
 		slackMsg := fmt.Sprintf("SSH cert request from %s with id %s for %s", config.AuthorizedUsers[requesterFp], requestIDStr, reason)
@@ -161,16 +159,30 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 		}
 	}
 
+	var returnStatus int
+	if signed {
+		slackMsg := fmt.Sprintf("SSH cert request %s auto signed.", requestID)
+		err := ssh_ca_client.PostToSlack(config.SlackUrl, config.SlackChannel, slackMsg)
+		if err != nil {
+			log.Printf("Unable to post to slack for %s: %v", requestID, err)
+		}
+		returnStatus = http.StatusAccepted
+	} else {
+		returnStatus = http.StatusCreated
+	}
+	rw.WriteHeader(returnStatus)
+	rw.Write([]byte(requestIDStr))
+
 	return
 }
 
-func (h *certRequestHandler) saveSigningRequest(config ssh_ca_util.SignerdConfig, environment, reason, requestIDStr string, requestSerial uint64, cert *ssh.Certificate) error {
+func (h *certRequestHandler) saveSigningRequest(config ssh_ca_util.SignerdConfig, environment, reason, requestIDStr string, requestSerial uint64, cert *ssh.Certificate) (bool, error) {
 	requesterFp := ssh_ca_util.MakeFingerprint(cert.SignatureKey.Marshal())
 
 	maxValidBefore := uint64(time.Now().Add(time.Duration(config.MaxCertLifetime) * time.Second).Unix())
 
 	if config.MaxCertLifetime != 0 && cert.ValidBefore > maxValidBefore {
-		return fmt.Errorf("Certificate is valid longer than maximum permitted by configuration %d > %d",
+		return false, fmt.Errorf("Certificate is valid longer than maximum permitted by configuration %d > %d",
 			cert.ValidBefore, maxValidBefore)
 	}
 
@@ -179,36 +191,44 @@ func (h *certRequestHandler) saveSigningRequest(config ssh_ca_util.SignerdConfig
 	var ok bool
 	cert.KeyId, ok = config.AuthorizedUsers[requesterFp]
 	if !ok {
-		return fmt.Errorf("Requester fingerprint (%s) not found in config", requesterFp)
+		return false, fmt.Errorf("Requester fingerprint (%s) not found in config", requesterFp)
 	}
 
 	if requestSerial == 0 {
-		return fmt.Errorf("Serial number not set.")
+		return false, fmt.Errorf("Serial number not set.")
 	}
 	cert.Serial = requestSerial
 
 	certRequest := newcertRequest()
 	certRequest.request = cert
 	if environment == "" {
-		return fmt.Errorf("Environment is a required field")
+		return false, fmt.Errorf("Environment is a required field")
 	}
 	certRequest.environment = environment
 
 	if reason == "" {
-		return fmt.Errorf("Reason is a required field")
+		return false, fmt.Errorf("Reason is a required field")
 	}
 	certRequest.reason = reason
 
 	if len(requestIDStr) < 12 {
-		return fmt.Errorf("Request id is too short to be useful.")
+		return false, fmt.Errorf("Request id is too short to be useful.")
 	}
 	_, ok = h.state[requestIDStr]
 	if ok {
-		return fmt.Errorf("Request id '%s' already in use.", requestIDStr)
+		return false, fmt.Errorf("Request id '%s' already in use.", requestIDStr)
 	}
 	h.state[requestIDStr] = certRequest
 
-	return nil
+	// This is the special case of supporting auto-signing.
+	if config.NumberSignersRequired < 0 {
+		signed, err := h.maybeSignWithCa(requestIDStr, config.NumberSignersRequired, config.SigningKeyFingerprint)
+		if signed && err == nil {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (h *certRequestHandler) extractCertFromRequest(req *http.Request) (*ssh.Certificate, error) {
@@ -391,7 +411,7 @@ func (h *certRequestHandler) signOrRejectRequest(rw http.ResponseWriter, req *ht
 	log.Printf("Signature for serial %d id %s received from %s (%s) @ %s and determined valid\n",
 		signedCert.Serial, requestID, signerFp, envConfig.AuthorizedSigners[signerFp], req.RemoteAddr)
 	if req.Method == "POST" {
-		err = h.addConfirmation(requestID, signerFp, envConfig, true)
+		err = h.addConfirmation(requestID, signerFp, envConfig)
 	} else {
 		err = h.rejectRequest(requestID, signerFp, envConfig)
 	}
@@ -409,7 +429,7 @@ func (h *certRequestHandler) rejectRequest(requestID string, signerFp string, en
 	return nil
 }
 
-func (h *certRequestHandler) addConfirmation(requestID string, signerFp string, envConfig ssh_ca_util.SignerdConfig, actuallySign bool) error {
+func (h *certRequestHandler) addConfirmation(requestID string, signerFp string, envConfig ssh_ca_util.SignerdConfig) error {
 	if h.state[requestID].certRejected {
 		return fmt.Errorf("Attempt to sign a rejected cert.")
 	}
@@ -424,7 +444,7 @@ func (h *certRequestHandler) addConfirmation(requestID string, signerFp string, 
 			log.Printf("Unable to post to slack for %s: %v", requestID, err)
 		}
 	}
-	signed, err := h.maybeSignWithCa(requestID, envConfig.NumberSignersRequired, envConfig.SigningKeyFingerprint, actuallySign)
+	signed, err := h.maybeSignWithCa(requestID, envConfig.NumberSignersRequired, envConfig.SigningKeyFingerprint)
 	if signed && err == nil {
 		slackMsg := fmt.Sprintf("SSH cert request %s fully signed.", requestID)
 		err := ssh_ca_client.PostToSlack(envConfig.SlackUrl, envConfig.SlackChannel, slackMsg)
@@ -435,11 +455,12 @@ func (h *certRequestHandler) addConfirmation(requestID string, signerFp string, 
 	return err
 }
 
-func (h *certRequestHandler) maybeSignWithCa(requestID string, numSignersRequired int, signingKeyFingerprint string, actuallySign bool) (bool, error) {
+func (h *certRequestHandler) maybeSignWithCa(requestID string, numSignersRequired int, signingKeyFingerprint string) (bool, error) {
 	if len(h.state[requestID].signatures) >= numSignersRequired {
-		if !actuallySign {
+		if h.sshAgentConn == nil {
 			// This is used for testing. We're effectively disabling working
 			// with the ssh agent to avoid needing to mock it.
+			log.Print("ssh agent uninitialized, will not attempt signing. This is normal in unittests")
 			return true, nil
 		}
 		log.Printf("Received %d signatures for %s, signing now.\n", len(h.state[requestID].signatures), requestID)

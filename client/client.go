@@ -192,7 +192,7 @@ func (req *CertRequest) PostToWeb(requestParameters url.Values) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	if resp.StatusCode == 201 {
+	if resp.StatusCode == 201 || resp.StatusCode == 202 {
 		return string(respBuf), nil
 	} else {
 		return "", fmt.Errorf("Cert request rejected: %s", string(respBuf))

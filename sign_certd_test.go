@@ -78,7 +78,7 @@ func TestRejectRequest(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert := pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
 	if err != nil {
 		t.Fatalf("Should have succeeded. Failed with: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestRejectRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Should have succeeded. Failed with: %v", err)
 	}
-	err = requestHandler.addConfirmation("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig, false)
+	err = requestHandler.addConfirmation("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig)
 	if err == nil {
 		t.Fatalf("Sign after reject should fail.")
 	}
@@ -104,12 +104,12 @@ func TestRejectRequestAfterSigning(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert := pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
 	if err != nil {
 		t.Fatalf("Should have succeeded. Failed with: %v", err)
 	}
 
-	err = requestHandler.addConfirmation("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig, false)
+	err = requestHandler.addConfirmation("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig)
 	if err != nil {
 		t.Fatalf("Sign should have worked. It failed: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestRejectRequestAfterSigning(t *testing.T) {
 		t.Fatalf("Should have succeeded. Failed with: %v", err)
 	}
 
-	err = requestHandler.addConfirmation("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig, false)
+	err = requestHandler.addConfirmation("DEADBEEFDEADBEEF", "23:10:8d:d0:54:90:d5:d1:2e:4d:05:fe:4b:54:29:e4", envConfig)
 	if err == nil {
 		t.Fatalf("Sign after reject should fail.")
 	}
@@ -136,7 +136,7 @@ func TestSaveForeverCertDisallowed(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert := pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed because cert never expires.")
 	}
@@ -146,7 +146,7 @@ func TestSaveForeverCertDisallowed(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert = pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed because cert expires in 2025.")
 	}
@@ -163,7 +163,7 @@ func TestSaveForeverCertAllowed(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert := pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
 	if err != nil {
 		t.Fatalf("Should have worked, failed with: %v", err)
 	}
@@ -173,9 +173,29 @@ func TestSaveForeverCertAllowed(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert = pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF2", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF2", 1, cert)
 	if err != nil {
 		t.Fatalf("Should have worked, failed with: %v", err)
+	}
+}
+
+func TestSaveRequestAutoSign(t *testing.T) {
+	allConfig := SetupSignerdConfig(-1, 0)
+	environment := "testing"
+	envConfig := allConfig[environment]
+	requestHandler := makeCertRequestHandler(allConfig)
+
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(boringUserCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	cert := pubKey.(*ssh.Certificate)
+	signed, err := requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	if err != nil {
+		t.Fatalf("Should have succeeded. Failed with: %v", err)
+	}
+	if !signed {
+		t.Fatal("Should have auto signed. But we didn't.")
 	}
 }
 
@@ -190,29 +210,29 @@ func TestSaveRequestValidCert(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert := pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
 	if err != nil {
 		t.Fatalf("Should have succeeded. Failed with: %v", err)
 	}
 
-	err = requestHandler.saveSigningRequest(envConfig, environment, "", "DEADBEEFDEAD1111", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "", "DEADBEEFDEAD1111", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed, reason was missing.")
 	}
-	err = requestHandler.saveSigningRequest(envConfig, "", "reason: testing", "DEADBEEFDEAD2222", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, "", "reason: testing", "DEADBEEFDEAD2222", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed, environment was missing.")
 	}
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "EEEFDF", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "EEEFDF", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed with invalid request id (too short).")
 	}
 
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "IAM_A_DUPLICATE_ID", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "IAM_A_DUPLICATE_ID", 1, cert)
 	if err != nil {
 		t.Fatalf("Should have succeeded. Failed with: %v", err)
 	}
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "IAM_A_DUPLICATE_ID", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "IAM_A_DUPLICATE_ID", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed with duplicate error")
 	}
@@ -229,7 +249,7 @@ func TestSaveRequestInvalidCert(t *testing.T) {
 		t.Fatalf("Parsing canned cert failed: %v", err)
 	}
 	cert := pubKey.(*ssh.Certificate)
-	err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
+	_, err = requestHandler.saveSigningRequest(envConfig, environment, "reason: testing", "DEADBEEFDEADBEEF", 1, cert)
 	if err == nil {
 		t.Fatalf("Should have failed with fingerprint not in list error.")
 	}
