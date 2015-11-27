@@ -5,21 +5,26 @@ LABEL Description="up-to-date ubuntu environment" Vendor="Cloudtools"
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    git-core
+    git-core \
+    golang
 
 LABEL Description="up-to-date golang environment"
 
 RUN mkdir -p /build
+RUN curl -O https://storage.googleapis.com/golang/go1.5.1.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf go1.5.1.linux-amd64.tar.gz
 
+ENV GOROOT_BOOTSTRAP=/usr/local/go
 ENV GOROOT=/build/go-build/go
-ENV PATH=/build/go-build/go/bin:/usr/local/bin:/usr/bin:/bin
+ENV PATH=/build/go-build/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/go/bin
 
-RUN mkdir -p /build/go-build; \
-    cd /build/go-build; \
-    curl -s https://storage.googleapis.com/golang/go1.4.2.src.tar.gz | tar -zxf -; \
-    cd /build/go-build/go/src; \
-    GOOS=darwin GOARCH=amd64 ./make.bash --no-clean 2>&1 > /dev/null ;
-
+RUN mkdir -p /build/go-build \
+    && cd /build/go-build \
+    && curl -o go.tar.gz -s https://storage.googleapis.com/golang/go1.5.1.src.tar.gz \
+    && echo "0df564746d105f4180c2b576a1553ebca9d9a124 go.tar.gz" | sha1sum -c - \
+    && tar -zxf go.tar.gz \
+    && cd /build/go-build/go/src \
+    && GOOS=darwin GOARCH=amd64 ./make.bash --no-clean 2>&1 > /dev/null ;
 
 LABEL Description="ssh-cert-authority builder"
 
