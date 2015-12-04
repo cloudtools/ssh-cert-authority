@@ -268,15 +268,21 @@ func (h *certRequestHandler) validateCert(cert *ssh.Certificate, authorizedSigne
 }
 
 type listResponseElement struct {
-	Signed   bool
-	CertBlob string
+	Signed             bool
+	CertBlob           string
+	NumSignatures      int
+	SignaturesRequired int
+	Serial             uint64
 }
 type certRequestResponse map[string]listResponseElement
 
-func newResponseElement(certBlob string, signed bool) listResponseElement {
+func newResponseElement(certBlob string, signed bool, numSignatures, signaturesRequired int, serial uint64) listResponseElement {
 	var element listResponseElement
 	element.CertBlob = certBlob
 	element.Signed = signed
+	element.NumSignatures = numSignatures
+	element.SignaturesRequired = signaturesRequired
+	element.Serial = serial
 	return element
 }
 
@@ -303,10 +309,10 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 		req.RemoteAddr, certRequestID)
 
 	foundSomething := false
-	results := make(map[string]listResponseElement)
+	results := make(certRequestResponse)
 	for k, v := range h.state {
 		encodedCert := base64.StdEncoding.EncodeToString(v.request.Marshal())
-		element := newResponseElement(encodedCert, v.certSigned)
+		element := newResponseElement(encodedCert, v.certSigned, len(v.signatures), h.Config[v.environment].NumberSignersRequired, v.request.Serial)
 		// Two ways to use this URL. If caller specified a certRequestId
 		// then we return only that one. Otherwise everything.
 		if certRequestID == "" {

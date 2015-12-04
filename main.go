@@ -35,6 +35,13 @@ func main() {
 			Action:  getCert,
 		},
 		{
+			Name:    "list",
+			Aliases: []string{"l"},
+			Flags:   listCertFlags(),
+			Usage:   "List pending requests on the server",
+			Action:  listCerts,
+		},
+		{
 			Name:   "runserver",
 			Flags:  signdFlags(),
 			Usage:  "Run the cert-authority web service",
