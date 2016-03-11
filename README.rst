@@ -272,6 +272,7 @@ Effectively the format is::
             NumberSignersRequired
             MaxCertLifetime
             SigningKeyFingerprint
+            PrivateKeyFile
             AuthorizedSigners {
                 <key fingerprint>: <key identity>
             }
@@ -290,7 +291,13 @@ Effectively the format is::
   value of 86400 would mean that the server will reject requests for
   certificates that are valid for more than 1 day.
 - ``SigningKeyFingerprint``: The fingerprint of the key that will be used to
-  sign complete requests. This should be the fingerprint of your CA.
+  sign complete requests. This should be the fingerprint of your CA. When using
+  this option you must, somehow, load the private key into the agent such that
+  the daemon can use it.
+- ``PrivateKeyFile``: A path to a private key file. As of this writing the key
+  must be unencrypted. Do take explicit care if you're using unencrypted
+  private keys. The next release / commit will include support for private key
+  files that are encrypted using Amazon's KMS.
 - ``AuthorizedSigners``: A hash keyed by key fingerprints and values of key
   ids. I recommend this be set to a username. It will appear in the
   resultant SSH certificate in the KeyId field as well in

@@ -13,7 +13,9 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -96,6 +98,41 @@ type signingRequest struct {
 	config      *ssh_ca_util.SignerdConfig
 	environment string
 	cert        *ssh.Certificate
+}
+
+func (h *certRequestHandler) setupPrivateKeys(config map[string]ssh_ca_util.SignerdConfig) error {
+	for env, cfg := range config {
+		if cfg.PrivateKeyFile != "" {
+			keyContents, err := ioutil.ReadFile(cfg.PrivateKeyFile)
+			if err != nil {
+				return fmt.Errorf("Failed reading private key file %s: %v", cfg.PrivateKeyFile, err)
+			}
+			key, err := ssh.ParseRawPrivateKey(keyContents)
+			if err != nil {
+				return fmt.Errorf("Failed parsing private key %s: %v", cfg.PrivateKeyFile, err)
+			}
+			keyToAdd := agent.AddedKey{
+				PrivateKey:   key,
+				Comment:      fmt.Sprintf("ssh-cert-authority-%s-%s", env, cfg.PrivateKeyFile),
+				LifetimeSecs: 0,
+			}
+			agentClient := agent.NewClient(h.sshAgentConn)
+			err = agentClient.Add(keyToAdd)
+			if err != nil {
+				return fmt.Errorf("Unable to add private key %s: %v", cfg.PrivateKeyFile, err)
+			}
+			signer, err := ssh.NewSignerFromKey(key)
+			if err != nil {
+				return fmt.Errorf("Unable to create signer from pk %s: %v", cfg.PrivateKeyFile, err)
+			}
+			keyFp := ssh_ca_util.MakeFingerprint(signer.PublicKey().Marshal())
+			log.Printf("Added private key for env %s: %s", env, keyFp)
+			cfg = config[env]
+			cfg.SigningKeyFingerprint = keyFp
+			config[env] = cfg
+		}
+	}
+	return nil
 }
 
 func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *http.Request) {
@@ -539,7 +576,6 @@ func makeCertRequestHandler(config map[string]ssh_ca_util.SignerdConfig) certReq
 
 func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) {
 	log.Println("Server running version", ssh_ca_util.BuildVersion)
-	log.Println("Server started with config", config)
 	log.Println("Using SSH agent at", os.Getenv("SSH_AUTH_SOCK"))
 
 	sshAgentConn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
@@ -549,6 +585,9 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) {
 	}
 	requestHandler := makeCertRequestHandler(config)
 	requestHandler.sshAgentConn = sshAgentConn
+	requestHandler.setupPrivateKeys(config)
+
+	log.Println("Server started with config", config)
 
 	r := mux.NewRouter()
 	requests := r.Path("/cert/requests").Subrouter()
