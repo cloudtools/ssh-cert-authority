@@ -23,8 +23,8 @@ ENV PATH=/build/go-build/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/go/bin
 
 RUN mkdir -p /build/go-build \
     && cd /build/go-build \
-    && curl -o go.tar.gz -s https://storage.googleapis.com/golang/go1.5.1.src.tar.gz \
-    && echo "0df564746d105f4180c2b576a1553ebca9d9a124 go.tar.gz" | sha1sum -c - \
+    && curl -o go.tar.gz -s https://storage.googleapis.com/golang/go1.6.src.tar.gz \
+    && echo "3282b6cb1e491662f7067544605d8cbf6f016553 go.tar.gz" | sha1sum -c - \
     && tar -zxf go.tar.gz \
     && cd /build/go-build/go/src \
     && GOOS=darwin GOARCH=amd64 ./make.bash --no-clean 2>&1 > /dev/null ;
