@@ -21,6 +21,7 @@ type SignerdConfig struct {
 	SlackChannel          string
 	MaxCertLifetime       int
 	PrivateKeyFile        string
+	KmsRegion             string
 }
 
 type SignerConfig struct {

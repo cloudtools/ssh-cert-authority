@@ -47,6 +47,12 @@ func main() {
 			Usage:  "Run the cert-authority web service",
 			Action: signCertd,
 		},
+		{
+			Name:   "encrypt-key",
+			Flags:  encryptFlags(),
+			Usage:  "Encrypt an ssh private key from stdin",
+			Action: encryptKey,
+		},
 	}
 	app.Run(os.Args)
 }

@@ -273,6 +273,7 @@ Effectively the format is::
             MaxCertLifetime
             SigningKeyFingerprint
             PrivateKeyFile
+            KmsRegion
             AuthorizedSigners {
                 <key fingerprint>: <key identity>
             }
@@ -294,10 +295,18 @@ Effectively the format is::
   sign complete requests. This should be the fingerprint of your CA. When using
   this option you must, somehow, load the private key into the agent such that
   the daemon can use it.
-- ``PrivateKeyFile``: A path to a private key file. As of this writing the key
-  must be unencrypted. Do take explicit care if you're using unencrypted
-  private keys. The next release / commit will include support for private key
-  files that are encrypted using Amazon's KMS.
+- ``PrivateKeyFile``: A path to a private key file. The key may be
+  unencrypted or have previously been encrypted using Amazon's KMS. If
+  the key was encrypted using KMS simply name it with a ".kms" extension
+  and ssh-cert-authority will attempt to decrypt the key on startup. See
+  the section on Encrypting a CA Key for help in using KMS to encrypt
+  the key.
+- ``KmsRegion``: If sign_certd encounters a privatekey file with an
+  extension of ".kms" it will attempt to decrypt it using KMS in the
+  same region that the software is running in. It determines this using
+  the local instance's metadata server. If you're not running
+  ssh-cert-authority within AWS or if the key is in a different region
+  you'll need to specify the region here as a string, e.g. us-west-2.
 - ``AuthorizedSigners``: A hash keyed by key fingerprints and values of key
   ids. I recommend this be set to a username. It will appear in the
   resultant SSH certificate in the KeyId field as well in
@@ -336,6 +345,73 @@ You can take that value and add in your keys like so::
 
 Once the server is up and running it is bound to 0.0.0.0 on port 8080.
 
+Encrypting a CA Key Using Amazon's KMS
+======================================
+
+Amazon's KMS (Key Management Service) provides an encryption key
+management service that can be used to encrypt small chunks of arbitrary
+data (including other keys). This project supports using KMS to keep the
+CA key secure.
+
+The recommended deployment is to launch ssh-cert-authority onto an EC2
+instance that has an EC2 instance profile attached to it that allows it
+to use KMS to decrypt the CA key. A sample cloudformation stack is
+forthcoming to do all of this on your behalf.
+
+Create Instance Profile
+```````````````````````
+
+In the mean time you can set things up by hand. A sample EC2 instance
+profile access policy::
+
+    {
+        "Statement": [
+            {
+                "Resource": [
+                    "*"
+                ],
+                "Action": [
+                    "kms:Encrypt",
+                    "kms:Decrypt",
+                    "kms:ReEncrypt",
+                    "kms:GenerateDataKey",
+                    "kms:DescribeKey"
+                ],
+                "Effect": "Allow"
+            }
+        ],
+        "Version": "2012-10-17"
+    }
+
+Create KMS Key
+``````````````
+
+Create a KMS key in the AWS IAM console. When specifying key usage allow the
+instance profile you created earlier to use the key. The key you create
+will have an id associated with it, it looks something like this:
+
+    arn:aws:kms:us-west-2:123412341234:key/debae348-3666-4cc7-9d25-41e33edb2909
+
+Save that for the next step.
+
+Launch Instance
+```````````````
+
+Now launch an instance and use the EC2 instance profile. A t2 class instance is
+likely sufficient. Copy over the latest ssh-cert-authority binary (you
+can also use the container) and generate a new key for the CA using
+ssh-keygen and then use ssh-cert-authority to encrypt it::
+
+    environment_name=production
+    ssh-keygen -q -t rsa -b 4096 -C "ssh-cert-authority ${environment_name}" -f ca-key-${environment_name}
+    cat ca-key-${environment_name} | ./ssh-cert-authority-linux-amd64 encrypt-key --key-id \
+        arn:aws:kms:us-west-2:881577346222:key/d1401480-8220-4bb7-a1de-d03dfda44a13 \
+        --output ca-key-${environment_name}.kms && rm ca-key-${environment_name}
+
+At this point you're ready to fire up the authority. The rest of this
+document applies, simply add a PrivateKeyFile option to signer certd's
+config for the environment you're working on and reference the path to
+the encrypted file we just created, `ca-key-${environment_name}.kms`
 
 Requesting Certificates
 =======================

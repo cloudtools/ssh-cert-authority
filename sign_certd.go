@@ -8,6 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/cloudtools/ssh-cert-authority/client"
 	"github.com/cloudtools/ssh-cert-authority/util"
 	"github.com/codegangsta/cli"
@@ -106,6 +110,29 @@ func (h *certRequestHandler) setupPrivateKeys(config map[string]ssh_ca_util.Sign
 			keyContents, err := ioutil.ReadFile(cfg.PrivateKeyFile)
 			if err != nil {
 				return fmt.Errorf("Failed reading private key file %s: %v", cfg.PrivateKeyFile, err)
+			}
+			if strings.HasSuffix(cfg.PrivateKeyFile, ".kms") {
+				var region string
+				if cfg.KmsRegion != "" {
+					region = cfg.KmsRegion
+				} else {
+					region, err = ec2metadata.New(session.New(), aws.NewConfig()).Region()
+					if err != nil {
+						return fmt.Errorf("Unable to determine our region: %s", err)
+					}
+				}
+				svc := kms.New(session.New(), aws.NewConfig().WithRegion(region))
+				params := &kms.DecryptInput{
+					CiphertextBlob: keyContents,
+				}
+				resp, err := svc.Decrypt(params)
+				if err != nil {
+					// We try only one time to speak with KMS. If this pukes, and it
+					// will occasionally because "the cloud", the caller is responsible
+					// for trying again, possibly after a crash/restart.
+					return fmt.Errorf("Unable to decrypt CA key: %v\n", err)
+				}
+				keyContents = resp.Plaintext
 			}
 			key, err := ssh.ParseRawPrivateKey(keyContents)
 			if err != nil {
@@ -585,7 +612,11 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) {
 	}
 	requestHandler := makeCertRequestHandler(config)
 	requestHandler.sshAgentConn = sshAgentConn
-	requestHandler.setupPrivateKeys(config)
+	err = requestHandler.setupPrivateKeys(config)
+	if err != nil {
+		log.Println("Failed CA key load: %v\n", err)
+		os.Exit(1)
+	}
 
 	log.Println("Server started with config", config)
 
