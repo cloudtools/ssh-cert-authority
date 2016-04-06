@@ -223,6 +223,7 @@ building and distributing software). The subcommands are:
     - request
     - sign
     - get
+    - encrypt-key
 
 As you might have guessed by now this means that a server needs to be
 running and serving the ssh-cert-authority service. Users that require
@@ -400,18 +401,25 @@ Launch Instance
 Now launch an instance and use the EC2 instance profile. A t2 class instance is
 likely sufficient. Copy over the latest ssh-cert-authority binary (you
 can also use the container) and generate a new key for the CA using
-ssh-keygen and then use ssh-cert-authority to encrypt it::
+ssh-cert-authority. The nice thing here is that the key is never written
+anywhere unencrypted. It is generated within ssh-cert-authority,
+encrypted via KMS and then written to disk in encrypted form. ::
 
     environment_name=production
-    ssh-keygen -q -t rsa -b 4096 -C "ssh-cert-authority ${environment_name}" -f ca-key-${environment_name}
-    cat ca-key-${environment_name} | ./ssh-cert-authority-linux-amd64 encrypt-key --key-id \
-        arn:aws:kms:us-west-2:881577346222:key/d1401480-8220-4bb7-a1de-d03dfda44a13 \
-        --output ca-key-${environment_name}.kms && rm ca-key-${environment_name}
+    ssh-cert-authority encrypt-key --generate-rsa \
+        --key-id arn:aws:kms:us-west-2:881577346222:key/d1401480-8220-4bb7-a1de-d03dfda44a13 \
+        --output ca-key-${environment}.kms
 
-At this point you're ready to fire up the authority. The rest of this
-document applies, simply add a PrivateKeyFile option to signer certd's
-config for the environment you're working on and reference the path to
-the encrypted file we just created, `ca-key-${environment_name}.kms`
+The output of this is two files: ca-key-production.kms and
+ca-key-production.kms.pub. The kms file should be referenced in the ssh
+cert authority config file, as documented elsewhere in this file, and
+the .pub file will be used within authorized_keys on servers you wish to
+SSH to.
+
+--generate-rsa will generate a 4096 bit RSA key. --generate-ecdsa will
+generate a key from nist's p384 curve. ECDSA support is nonexistent on
+OS X hosts unless your users build openssh from scratch (or homebrew).
+This is considered painful.
 
 Requesting Certificates
 =======================

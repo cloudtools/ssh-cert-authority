@@ -2,12 +2,19 @@ package main
 
 import (
 	"bufio"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/codegangsta/cli"
+	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"os"
 )
@@ -24,30 +31,113 @@ func encryptFlags() []cli.Flag {
 			Value: "ca-key.kms",
 			Usage: "The filename for key output",
 		},
+		cli.BoolFlag{
+			Name:  "generate-ecdsa",
+			Usage: "When set generate an ECDSA key from Curve P384",
+		},
+		cli.BoolFlag{
+			Name:  "generate-rsa",
+			Usage: "When set generate a 4096 bit RSA key",
+		},
 	}
 }
 
-func encryptKey(c *cli.Context) {
+func generateRsa() ([]byte, error) {
+	key, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, err
+	}
+	derBlock := x509.MarshalPKCS1PrivateKey(key)
+	pemBlock := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: derBlock,
+	}
+	return pem.EncodeToMemory(pemBlock), nil
+}
+
+func generateEcdsa() ([]byte, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	derBlock, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		return nil, err
+	}
+	pemBlock := &pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: derBlock,
+	}
+	return pem.EncodeToMemory(pemBlock), nil
+}
+
+func cmdEncryptKey(c *cli.Context) {
 	region, err := ec2metadata.New(session.New(), aws.NewConfig()).Region()
 	if err != nil {
 		fmt.Printf("Unable to determine our region: %s", err)
 		os.Exit(1)
 	}
+	keyId := c.String("key-id")
+
+	var ciphertext []byte
+	if c.Bool("generate-ecdsa") || c.Bool("generate-rsa") {
+		var key []byte
+		if c.Bool("generate-ecdsa") {
+			key, err = generateEcdsa()
+		} else {
+			key, err = generateRsa()
+		}
+		if err != nil {
+			fmt.Printf("Unable to generate key: %s", err)
+			os.Exit(1)
+		}
+		ciphertext, err = encryptKey(key, region, keyId)
+		if err != nil {
+			fmt.Printf("Unable to generate ecdsa key: %s", err)
+			os.Exit(1)
+		}
+		signer, err := ssh.ParsePrivateKey(key)
+		if err != nil {
+			fmt.Printf("Unable to parse generated private key: %s", err)
+			os.Exit(1)
+		}
+		err = ioutil.WriteFile(c.String("output")+".pub", ssh.MarshalAuthorizedKey(signer.PublicKey()), 0644)
+		if err != nil {
+			fmt.Printf("Unable to write new public key: %s", err)
+			os.Exit(1)
+		}
+	} else {
+		ciphertext, err = encryptKeyFromStdin(keyId, region)
+		if err != nil {
+			fmt.Printf("Failed to encrypt key: %s", err)
+			os.Exit(1)
+		}
+	}
+	err = ioutil.WriteFile(c.String("output"), ciphertext, 0644)
+	if err != nil {
+		fmt.Printf("Unable to write new encrypted private key: %s", err)
+		os.Exit(1)
+	}
+}
+
+func encryptKeyFromStdin(keyId, region string) ([]byte, error) {
 	keyContents, err := ioutil.ReadAll(bufio.NewReader(os.Stdin))
 	if err != nil {
 		fmt.Printf("Unable to read private key: %s", err)
 		os.Exit(1)
 	}
+	return encryptKey(keyContents, region, keyId)
+}
+
+func encryptKey(plaintextKey []byte, region, kmsKeyId string) ([]byte, error) {
 	svc := kms.New(session.New(), aws.NewConfig().WithRegion(region))
 	params := &kms.EncryptInput{
-		Plaintext: keyContents,
-		KeyId:     aws.String(c.String("key-id")),
+		Plaintext: plaintextKey,
+		KeyId:     aws.String(kmsKeyId),
 	}
 	resp, err := svc.Encrypt(params)
 	if err != nil {
-		fmt.Printf("Unable to Encrypt CA key: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("Unable to Encrypt CA key: %v\n", err)
 	}
-	keyContents = resp.CiphertextBlob
-	ioutil.WriteFile(c.String("output"), resp.CiphertextBlob, 0444)
+	return []byte(resp.CiphertextBlob), nil
 }

@@ -50,8 +50,8 @@ func main() {
 		{
 			Name:   "encrypt-key",
 			Flags:  encryptFlags(),
-			Usage:  "Encrypt an ssh private key from stdin",
-			Action: encryptKey,
+			Usage:  "Optionally generate and then encrypt an ssh private key",
+			Action: cmdEncryptKey,
 		},
 	}
 	app.Run(os.Args)
