@@ -360,7 +360,7 @@ to use KMS to decrypt the CA key. A sample cloudformation stack is
 forthcoming to do all of this on your behalf.
 
 Create Instance Profile
-```````````````````````
+-----------------------
 
 In the mean time you can set things up by hand. A sample EC2 instance
 profile access policy::
@@ -385,18 +385,18 @@ profile access policy::
     }
 
 Create KMS Key
-``````````````
+--------------
 
 Create a KMS key in the AWS IAM console. When specifying key usage allow the
 instance profile you created earlier to use the key. The key you create
-will have an id associated with it, it looks something like this:
+will have an id associated with it, it looks something like this::
 
     arn:aws:kms:us-west-2:123412341234:key/debae348-3666-4cc7-9d25-41e33edb2909
 
 Save that for the next step.
 
 Launch Instance
-```````````````
+---------------
 
 Now launch an instance and use the EC2 instance profile. A t2 class instance is
 likely sufficient. Copy over the latest ssh-cert-authority binary (you
@@ -410,13 +410,13 @@ encrypted via KMS and then written to disk in encrypted form. ::
         --key-id arn:aws:kms:us-west-2:881577346222:key/d1401480-8220-4bb7-a1de-d03dfda44a13 \
         --output ca-key-${environment}.kms
 
-The output of this is two files: ca-key-production.kms and
-ca-key-production.kms.pub. The kms file should be referenced in the ssh
+The output of this is two files: ``ca-key-production.kms`` and
+``ca-key-production.kms.pub``. The kms file should be referenced in the ssh
 cert authority config file, as documented elsewhere in this file, and
 the .pub file will be used within authorized_keys on servers you wish to
 SSH to.
 
---generate-rsa will generate a 4096 bit RSA key. --generate-ecdsa will
+``--generate-rsa`` will generate a 4096 bit RSA key. ``--generate-ecdsa`` will
 generate a key from nist's p384 curve. ECDSA support is nonexistent on
 OS X hosts unless your users build openssh from scratch (or homebrew).
 This is considered painful.
@@ -432,4 +432,7 @@ Signing Requests
 See USAGE.rst in this directory.
 
 All in one basic happy test case::
-    go build && reqId=$(./ssh-cert-authority request --reason testing --environment test --quiet) &&./ssh-cert-authority sign --environment test --cert-request-id $reqId && ./ssh-cert-authority get --add-key=false --environment test $reqId
+
+    go build && reqId=$(./ssh-cert-authority request --reason testing --environment test --quiet) && \
+    ./ssh-cert-authority sign --environment test --cert-request-id $reqId && \
+    ./ssh-cert-authority get --add-key=false --environment test $reqId`
