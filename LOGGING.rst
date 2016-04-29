@@ -68,32 +68,32 @@ When a certificate is requested from a user a log message is generated::
 
 Let's parse this one.
 
-`Cert request serial 1`: This certificate has been allocated serial
+``Cert request serial 1``: This certificate has been allocated serial
 number 1.
 
-`id ONMZX7GITLGJ4BCN`: This certificate was generated this random id.
+``id ONMZX7GITLGJ4BCN``: This certificate was generated this random id.
 This id is used by requesters and signers to sign and retrieve signed
 certificates from the system. It is not embedded in the certificate.
 
-`env test`: This certificate is for the "test" environment.
+``env test``: This certificate is for the "test" environment.
 
-`from 66:b5:be:e5:7e:09:3f:98:97:36:9b:64:ec:ea:3a:fe (bvz)` The request
+``from 66:b5:be:e5:7e:09:3f:98:97:36:9b:64:ec:ea:3a:fe (bvz)`` The request
 was received for the certificate with the fingerprint listed there.
 According to our configuration file this certificate is for the user
 bvz.
 
-`@ [::1]:64273` The certificate request came in from localhost with a
+``@ [::1]:64273`` The certificate request came in from localhost with a
 source port of 64273. Typically this contains a non-localhost IP
 address but that varies based on the deployment configuration (if you're
 behind a reverse proxy ssh-cert-authority doesn't yet parse the
 X-Forwarded-For header).
 
-`principals [ec2-user ubuntu]` This certificate has the principals
+``principals [ec2-user ubuntu]`` This certificate has the principals
 ec2-user and ubuntu. That maps directly to the principals option in the
 certificate and allows this certificate holder to attempt to login as
-either the user `ec2-user` or `ubuntu`.
+either the user ``ec2-user`` or ``ubuntu``.
 
-`valid from 1461956318 to 1461963638` This certificate is valid between
+``valid from 1461956318 to 1461963638`` This certificate is valid between
 these two unix timestamps. An easy way of decoding this timestamp is
 with python::
 
@@ -101,7 +101,7 @@ with python::
     >>> time.ctime(1461956318)
     'Fri Apr 29 14:58:38 2016'
 
-`for 'Investigate disk full scenario'` This is the reason that the user
+``for 'Investigate disk full scenario'`` This is the reason that the user
 specified when requesting the certificate. The encoding of these log
 messages is UTF-8 and the reason field in particular is capable of
 containing non-ascii characters if the user enters them. The reason is
