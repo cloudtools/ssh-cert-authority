@@ -148,7 +148,7 @@ func requestCert(c *cli.Context) {
 		os.Exit(1)
 	}
 	switch signer.PublicKey().Type() {
-	case ssh.KeyAlgoRSA, ssh.KeyAlgoDSA, ssh.KeyAlgoECDSA256, ssh.KeyAlgoECDSA384, ssh.KeyAlgoECDSA521:
+	case ssh.KeyAlgoRSA, ssh.KeyAlgoDSA, ssh.KeyAlgoECDSA256, ssh.KeyAlgoECDSA384, ssh.KeyAlgoECDSA521, ssh.KeyAlgoED25519:
 	default:
 		fmt.Println("Unsupported ssh key type:", signer.PublicKey().Type())
 		fmt.Println("We support rsa, dsa and ecdsa. Need golang support for other algorithms.")
