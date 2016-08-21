@@ -59,7 +59,7 @@ func (req *SigningRequest) PostToWeb(requestParameters url.Values) error {
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		respBuf, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("HTTP %d: %s", resp.Status, string(respBuf))
+		return fmt.Errorf("HTTP %s: %s", resp.Status, string(respBuf))
 	} else {
 		return nil
 	}
@@ -80,7 +80,7 @@ func (req *SigningRequest) DeleteToWeb(requestParameters url.Values) error {
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		respBuf, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("HTTP %d: %s", resp.Status, string(respBuf))
+		return fmt.Errorf("HTTP %s: %s", resp.Status, string(respBuf))
 	} else {
 		return nil
 	}

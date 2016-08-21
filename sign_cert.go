@@ -88,7 +88,7 @@ func signCert(c *cli.Context) error {
 	requestParameters["certRequestId"][0] = certRequestID
 	getResp, err := http.Get(config.SignerUrl + "cert/requests?" + requestParameters.Encode())
 	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Didn't get a valid response: %s"), 1)
+		return cli.NewExitError(fmt.Sprintf("Didn't get a valid response: %s", err), 1)
 	}
 	getRespBuf, err := ioutil.ReadAll(getResp.Body)
 	if err != nil {

@@ -582,7 +582,7 @@ func signCertd(c *cli.Context) error {
 	config := make(map[string]ssh_ca_util.SignerdConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &config)
 	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Load Config failed:", err), 1)
+		return cli.NewExitError(fmt.Sprintf("Load Config failed: %s", err), 1)
 	}
 	err = runSignCertd(config)
 	return err
@@ -608,7 +608,7 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) error {
 
 	sshAgentConn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Dial failed:", err), 1)
+		return cli.NewExitError(fmt.Sprintf("Dial failed: %s", err), 1)
 	}
 	requestHandler := makeCertRequestHandler(config)
 	requestHandler.sshAgentConn = sshAgentConn

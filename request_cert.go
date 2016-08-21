@@ -147,11 +147,11 @@ func requestCert(c *cli.Context) error {
 	caRequest.SetPublicKey(signer.PublicKey(), pubKeyComment)
 	newCert, err := caRequest.EncodeAsCertificate()
 	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Error encoding certificate request:", err), 1)
+		return cli.NewExitError(fmt.Sprintf("Error encoding certificate request: %s", err), 1)
 	}
 	err = newCert.SignCert(rand.Reader, signer)
 	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Error signing:", err), 1)
+		return cli.NewExitError(fmt.Sprintf("Error signing: %s", err), 1)
 	}
 
 	certRequest := newCert.Marshal()

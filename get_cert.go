@@ -59,7 +59,7 @@ func getCert(c *cli.Context) error {
 	}
 	getRespBuf, err := ioutil.ReadAll(getResp.Body)
 	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Error reading response body", err), 1)
+		return cli.NewExitError(fmt.Sprintf("Error reading response body: %s", err), 1)
 	}
 	getResp.Body.Close()
 	if getResp.StatusCode != 200 {
@@ -68,7 +68,7 @@ func getCert(c *cli.Context) error {
 
 	pubKey, _, _, _, err := ssh.ParseAuthorizedKey(getRespBuf)
 	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Trouble parsing response", err), 1)
+		return cli.NewExitError(fmt.Sprintf("Trouble parsing response: %s", err), 1)
 	}
 	cert := pubKey.(*ssh.Certificate)
 	secondsRemaining := int64(cert.ValidBefore) - int64(time.Now().Unix())
