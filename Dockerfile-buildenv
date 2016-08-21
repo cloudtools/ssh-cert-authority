@@ -6,16 +6,15 @@ RUN apt-get update && \
     apt-get install -y \
         build-essential \
         curl \
-        git-core \
-        golang && \
+        git-core && \
     apt-get clean && \
     rm -rf /var/lib/apt
 
 LABEL Description="up-to-date golang environment"
 
 RUN mkdir -p /build
-RUN curl -O https://storage.googleapis.com/golang/go1.5.1.linux-amd64.tar.gz
-RUN tar -C /usr/local -xzf go1.5.1.linux-amd64.tar.gz
+RUN curl -O https://storage.googleapis.com/golang/go1.7.linux-amd64.tar.gz
+RUN tar -C /usr/local -xzf go1.7.linux-amd64.tar.gz
 
 ENV GOROOT_BOOTSTRAP=/usr/local/go
 ENV GOROOT=/build/go-build/go
@@ -23,8 +22,8 @@ ENV PATH=/build/go-build/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/go/bin
 
 RUN mkdir -p /build/go-build \
     && cd /build/go-build \
-    && curl -o go.tar.gz -s https://storage.googleapis.com/golang/go1.6.src.tar.gz \
-    && echo "3282b6cb1e491662f7067544605d8cbf6f016553 go.tar.gz" | sha1sum -c - \
+    && curl -o go.tar.gz -s https://storage.googleapis.com/golang/go1.7.src.tar.gz \
+    && echo "ca53aca78b60a7b3168a3e3df5a08546a634d043 go.tar.gz" | sha1sum -c - \
     && tar -zxf go.tar.gz \
     && cd /build/go-build/go/src \
     && GOOS=darwin GOARCH=amd64 ./make.bash --no-clean 2>&1 > /dev/null ;
