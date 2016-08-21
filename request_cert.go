@@ -44,12 +44,12 @@ func requestCertFlags() []cli.Flag {
 			Usage: "An environment name (e.g. prod)",
 		},
 		cli.StringFlag{
-			Name:  "config-file",
+			Name:  "config-file, c",
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
 		cli.StringFlag{
-			Name:  "reason",
+			Name:  "reason, r",
 			Value: "",
 			Usage: "Your reason for needing this SSH certificate.",
 		},
@@ -70,20 +70,18 @@ func requestCertFlags() []cli.Flag {
 	}
 }
 
-func requestCert(c *cli.Context) {
+func requestCert(c *cli.Context) error {
 	allConfig := make(map[string]ssh_ca_util.RequesterConfig)
 	configPath := c.String("config-file")
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	if err != nil {
-		fmt.Println("Load Config failed:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Load Config failed: %s", err), 1)
 	}
 
 	environment := c.String("environment")
 	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 	config := wrongTypeConfig.(ssh_ca_util.RequesterConfig)
 
@@ -95,8 +93,7 @@ func requestCert(c *cli.Context) {
 		reason = strings.TrimSpace(reason)
 	}
 	if reason == "" {
-		fmt.Println("Failed to give a reason.")
-		os.Exit(1)
+		return cli.NewExitError("Failed to give a reason", 1)
 	}
 
 	caRequest := ssh_ca_client.MakeCertRequest()
@@ -108,8 +105,7 @@ func requestCert(c *cli.Context) {
 	failed |= trueOnError(caRequest.SetPrincipalsFromString(c.String("principals")))
 
 	if failed == 1 {
-		fmt.Println("One or more errors found. Aborting request.")
-		os.Exit(1)
+		return cli.NewExitError("One or more errors found. Aborting request.", 1)
 	}
 
 	var chosenKeyFingerprint, pubKeyComment string
@@ -117,13 +113,11 @@ func requestCert(c *cli.Context) {
 	if config.PublicKeyPath != "" {
 		pubKeyContents, err := ioutil.ReadFile(config.PublicKeyPath)
 		if err != nil {
-			fmt.Println("Trouble opening your public key file", config.PublicKeyPath, err)
-			os.Exit(1)
+			return cli.NewExitError(fmt.Sprintf("Trouble opening your public key file %s: %s", config.PublicKeyPath, err), 1)
 		}
 		pubKey, pubKeyComment, _, _, err = ssh.ParseAuthorizedKey(pubKeyContents)
 		if err != nil {
-			fmt.Println("Trouble parsing your public key", err)
-			os.Exit(1)
+			return cli.NewExitError(fmt.Sprintf("Trouble parsing your public key: %s", err), 1)
 		}
 		chosenKeyFingerprint = ssh_ca_util.MakeFingerprint(pubKey.Marshal())
 	} else {
@@ -132,39 +126,32 @@ func requestCert(c *cli.Context) {
 	}
 
 	if chosenKeyFingerprint == "" {
-		fmt.Println("No SSH fingerprint found. Try setting PublicKeyFingerprint in requester config.")
-		os.Exit(1)
+		return cli.NewExitError("No SSH fingerprint found. Try setting PublicKeyFingerprint in requester config.", 1)
 	}
 
 	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
-		fmt.Println("Dial failed:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Dial failed: %s", err), 1)
 	}
 
 	signer, err := ssh_ca_util.GetSignerForFingerprint(chosenKeyFingerprint, conn)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 	switch signer.PublicKey().Type() {
 	case ssh.KeyAlgoRSA, ssh.KeyAlgoDSA, ssh.KeyAlgoECDSA256, ssh.KeyAlgoECDSA384, ssh.KeyAlgoECDSA521, ssh.KeyAlgoED25519:
 	default:
-		fmt.Println("Unsupported ssh key type:", signer.PublicKey().Type())
-		fmt.Println("We support rsa, dsa and ecdsa. Need golang support for other algorithms.")
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Unsupported ssh key type: %s\nWe support rsa, dsa, edd25519 and ecdsa. Need golang support for other algorithms.", signer.PublicKey().Type()), 1)
 	}
 
 	caRequest.SetPublicKey(signer.PublicKey(), pubKeyComment)
 	newCert, err := caRequest.EncodeAsCertificate()
 	if err != nil {
-		fmt.Println("Error encoding certificate request:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error encoding certificate request:", err), 1)
 	}
 	err = newCert.SignCert(rand.Reader, signer)
 	if err != nil {
-		fmt.Println("Error signing:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error signing:", err), 1)
 	}
 
 	certRequest := newCert.Marshal()
@@ -177,8 +164,7 @@ func requestCert(c *cli.Context) {
 			fmt.Printf("Cert request id: %s\n", requestID)
 		}
 	} else {
-		fmt.Println(err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
-
+	return nil
 }

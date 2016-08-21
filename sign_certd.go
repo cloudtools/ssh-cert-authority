@@ -577,15 +577,15 @@ func signdFlags() []cli.Flag {
 	}
 }
 
-func signCertd(c *cli.Context) {
+func signCertd(c *cli.Context) error {
 	configPath := c.String("config-file")
 	config := make(map[string]ssh_ca_util.SignerdConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &config)
 	if err != nil {
-		log.Println("Load Config failed:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Load Config failed:", err), 1)
 	}
-	runSignCertd(config)
+	err = runSignCertd(config)
+	return err
 }
 
 func makeCertRequestHandler(config map[string]ssh_ca_util.SignerdConfig) certRequestHandler {
@@ -602,21 +602,19 @@ func makeCertRequestHandler(config map[string]ssh_ca_util.SignerdConfig) certReq
 	return requestHandler
 }
 
-func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) {
+func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) error {
 	log.Println("Server running version", ssh_ca_util.BuildVersion)
 	log.Println("Using SSH agent at", os.Getenv("SSH_AUTH_SOCK"))
 
 	sshAgentConn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
-		log.Println("Dial failed:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Dial failed:", err), 1)
 	}
 	requestHandler := makeCertRequestHandler(config)
 	requestHandler.sshAgentConn = sshAgentConn
 	err = requestHandler.setupPrivateKeys(config)
 	if err != nil {
-		log.Printf("Failed CA key load: %v\n", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Failed CA key load: %v\n", err), 1)
 	}
 
 	log.Printf("Server started with config %#v\n", config)
@@ -629,4 +627,5 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) {
 	request.Methods("GET").HandlerFunc(requestHandler.getRequestStatus)
 	request.Methods("POST", "DELETE").HandlerFunc(requestHandler.signOrRejectRequest)
 	http.ListenAndServe(":8080", r)
+	return nil
 }

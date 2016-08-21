@@ -23,7 +23,7 @@ func getCertFlags() []cli.Flag {
 
 	return []cli.Flag{
 		cli.StringFlag{
-			Name:  "environment",
+			Name:  "environment, e",
 			Value: "",
 			Usage: "An environment name (e.g. prod)",
 		},
@@ -39,7 +39,7 @@ func getCertFlags() []cli.Flag {
 	}
 }
 
-func getCert(c *cli.Context) {
+func getCert(c *cli.Context) error {
 
 	configPath := c.String("config-file")
 	environment := c.String("environment")
@@ -49,44 +49,37 @@ func getCert(c *cli.Context) {
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 	config := wrongTypeConfig.(ssh_ca_util.RequesterConfig)
 
 	getResp, err := http.Get(config.SignerUrl + "cert/requests/" + certRequestID)
 	if err != nil {
-		fmt.Println("Didn't get a valid response", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Didn't get a valid response: %s", err), 1)
 	}
 	getRespBuf, err := ioutil.ReadAll(getResp.Body)
 	if err != nil {
-		fmt.Println("Error reading response body", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error reading response body", err), 1)
 	}
 	getResp.Body.Close()
 	if getResp.StatusCode != 200 {
-		fmt.Println("Error getting that request id:", string(getRespBuf))
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error getting that request id: %s", string(getRespBuf)), 1)
 	}
 
 	pubKey, _, _, _, err := ssh.ParseAuthorizedKey(getRespBuf)
 	if err != nil {
-		fmt.Println("Trouble parsing response", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Trouble parsing response", err), 1)
 	}
 	cert := pubKey.(*ssh.Certificate)
 	secondsRemaining := int64(cert.ValidBefore) - int64(time.Now().Unix())
 	if secondsRemaining < 1 {
-		fmt.Println("This certificate has already expired.")
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("This certificate has already expired."), 1)
 	}
 
 	pubKeyPath, err := findKeyLocally(cert.Key)
 
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 	pubKeyPath = strings.Replace(pubKeyPath, ".pub", "-cert.pub", 1)
 	err = ioutil.WriteFile(pubKeyPath, getRespBuf, 0644)
@@ -103,10 +96,10 @@ func getCert(c *cli.Context) {
 		cmd.Stdin = os.Stdin
 		err = cmd.Run()
 		if err != nil {
-			fmt.Println("Error in ssh-add")
-			os.Exit(1)
+			return cli.NewExitError(fmt.Sprintf("Error in ssh-add: %s", err), 1)
 		}
 	}
+	return nil
 }
 
 func findKeyLocally(key ssh.PublicKey) (string, error) {

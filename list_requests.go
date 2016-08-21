@@ -22,23 +22,23 @@ func listCertFlags() []cli.Flag {
 
 	return []cli.Flag{
 		cli.StringFlag{
-			Name:  "environment",
+			Name:  "environment, e",
 			Value: "",
 			Usage: "An environment name (e.g. prod)",
 		},
 		cli.StringFlag{
-			Name:  "config-file",
+			Name:  "config-file, c",
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
 		cli.BoolFlag{
-			Name:  "show-all",
+			Name:  "show-all, a",
 			Usage: "Show certs that have already been signed as well",
 		},
 	}
 }
 
-func listCerts(c *cli.Context) {
+func listCerts(c *cli.Context) error {
 
 	configPath := c.String("config-file")
 	environment := c.String("environment")
@@ -48,25 +48,21 @@ func listCerts(c *cli.Context) {
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 	config := wrongTypeConfig.(ssh_ca_util.RequesterConfig)
 
 	getResp, err := http.Get(config.SignerUrl + "cert/requests")
 	if err != nil {
-		fmt.Println("Didn't get a valid response", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Didn't get a valid response", err), 1)
 	}
 	getRespBuf, err := ioutil.ReadAll(getResp.Body)
 	if err != nil {
-		fmt.Println("Error reading response body", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error reading response body", err), 1)
 	}
 	getResp.Body.Close()
 	if getResp.StatusCode != 200 {
-		fmt.Println("Error getting listing of certs", string(getRespBuf))
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error getting listing of certs", string(getRespBuf)), 1)
 	}
 
 	certs := make(certRequestResponse)
@@ -75,13 +71,11 @@ func listCerts(c *cli.Context) {
 		if showAll || !respElement.Signed {
 			rawCert, err := base64.StdEncoding.DecodeString(respElement.CertBlob)
 			if err != nil {
-				fmt.Println("Trouble base64 decoding response:", err, respElement.CertBlob)
-				os.Exit(1)
+				return cli.NewExitError(fmt.Sprintf("Trouble base64 decoding response:", err, respElement.CertBlob), 1)
 			}
 			pubKey, err := ssh.ParsePublicKey(rawCert)
 			if err != nil {
-				fmt.Println("Trouble parsing response:", err)
-				os.Exit(1)
+				return cli.NewExitError(fmt.Sprintf("Trouble parsing response:", err), 1)
 			}
 			cert := *pubKey.(*ssh.Certificate)
 			env, ok := cert.Extensions["environment@cloudtools.github.io"]
@@ -107,4 +101,5 @@ func listCerts(c *cli.Context) {
 			}
 		}
 	}
+	return nil
 }

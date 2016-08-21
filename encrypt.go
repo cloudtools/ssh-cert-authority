@@ -71,11 +71,10 @@ func generateEcdsa() ([]byte, error) {
 	return pem.EncodeToMemory(pemBlock), nil
 }
 
-func cmdEncryptKey(c *cli.Context) {
+func cmdEncryptKey(c *cli.Context) error {
 	region, err := ec2metadata.New(session.New(), aws.NewConfig()).Region()
 	if err != nil {
-		fmt.Printf("Unable to determine our region: %s", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Unable to determine our region: %s", err), 1)
 	}
 	keyId := c.String("key-id")
 
@@ -88,43 +87,37 @@ func cmdEncryptKey(c *cli.Context) {
 			key, err = generateRsa()
 		}
 		if err != nil {
-			fmt.Printf("Unable to generate key: %s", err)
-			os.Exit(1)
+			return cli.NewExitError(fmt.Sprintf("Unable to generate key: %s", err), 1)
 		}
 		ciphertext, err = encryptKey(key, region, keyId)
 		if err != nil {
-			fmt.Printf("Unable to generate ecdsa key: %s", err)
-			os.Exit(1)
+			return cli.NewExitError(fmt.Sprintf("Unable to generate ecdsa key: %s", err), 1)
 		}
 		signer, err := ssh.ParsePrivateKey(key)
 		if err != nil {
-			fmt.Printf("Unable to parse generated private key: %s", err)
-			os.Exit(1)
+			return cli.NewExitError(fmt.Sprintf("Unable to parse generated private key: %s", err), 1)
 		}
 		err = ioutil.WriteFile(c.String("output")+".pub", ssh.MarshalAuthorizedKey(signer.PublicKey()), 0644)
 		if err != nil {
-			fmt.Printf("Unable to write new public key: %s", err)
-			os.Exit(1)
+			return cli.NewExitError(fmt.Sprintf("Unable to write new public key: %s", err), 1)
 		}
 	} else {
 		ciphertext, err = encryptKeyFromStdin(keyId, region)
 		if err != nil {
-			fmt.Printf("Failed to encrypt key: %s", err)
-			os.Exit(1)
+			return cli.NewExitError(fmt.Sprintf("Failed to encrypt key: %s", err), 1)
 		}
 	}
 	err = ioutil.WriteFile(c.String("output"), ciphertext, 0644)
 	if err != nil {
-		fmt.Printf("Unable to write new encrypted private key: %s", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Unable to write new encrypted private key: %s", err), 1)
 	}
+	return nil
 }
 
 func encryptKeyFromStdin(keyId, region string) ([]byte, error) {
 	keyContents, err := ioutil.ReadAll(bufio.NewReader(os.Stdin))
 	if err != nil {
-		fmt.Printf("Unable to read private key: %s", err)
-		os.Exit(1)
+		return nil, cli.NewExitError(fmt.Sprintf("Unable to read private key: %s", err), 1)
 	}
 	return encryptKey(keyContents, region, keyId)
 }

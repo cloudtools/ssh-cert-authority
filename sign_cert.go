@@ -34,12 +34,12 @@ func signCertFlags() []cli.Flag {
 
 	return []cli.Flag{
 		cli.StringFlag{
-			Name:  "environment",
+			Name:  "environment, e",
 			Value: "",
 			Usage: "An environment name (e.g. prod)",
 		},
 		cli.StringFlag{
-			Name:  "config-file",
+			Name:  "config-file, c",
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
@@ -51,41 +51,36 @@ func signCertFlags() []cli.Flag {
 	}
 }
 
-func signCert(c *cli.Context) {
+func signCert(c *cli.Context) error {
 	configPath := c.String("config-file")
 	allConfig := make(map[string]ssh_ca_util.SignerConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	if err != nil {
-		fmt.Println("Load Config failed:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Load Config failed: %s", err), 1)
 	}
 
 	certRequestID := c.String("cert-request-id")
 	if certRequestID == "" {
 		certRequestID = c.Args().First()
 		if certRequestID == "" {
-			fmt.Println("Specify a cert-request-id")
-			os.Exit(1)
+			return cli.NewExitError("Specify a cert-request-id", 1)
 		}
 	}
 	environment := c.String("environment")
 	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 	config := wrongTypeConfig.(ssh_ca_util.SignerConfig)
 
 	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
-		fmt.Println("Dial failed:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Dial failed: %s", err), 1)
 	}
 
 	signer, err := ssh_ca_util.GetSignerForFingerprint(config.KeyFingerprint, conn)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 
 	requestParameters := make(url.Values)
@@ -93,38 +88,31 @@ func signCert(c *cli.Context) {
 	requestParameters["certRequestId"][0] = certRequestID
 	getResp, err := http.Get(config.SignerUrl + "cert/requests?" + requestParameters.Encode())
 	if err != nil {
-		fmt.Println("Didn't get a valid response", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Didn't get a valid response: %s"), 1)
 	}
 	getRespBuf, err := ioutil.ReadAll(getResp.Body)
 	if err != nil {
-		fmt.Println("Error reading response body", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error reading response body: %s", err), 1)
 	}
 	getResp.Body.Close()
 	if getResp.StatusCode != 200 {
-		fmt.Println("Error getting that request id:", string(getRespBuf))
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error getting that request id: %s", string(getRespBuf)), 1)
 	}
 	getResponse := make(certRequestResponse)
 	err = json.Unmarshal(getRespBuf, &getResponse)
 	if err != nil {
-		fmt.Println("Unable to unmarshall response", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Unable to unmarshall response: %s", err), 1)
 	}
 	if getResponse[certRequestID].Signed {
-		fmt.Println("Certificate already signed. Thanks for trying.")
-		os.Exit(0)
+		return cli.NewExitError("Certificate already signed. Thanks for trying.", 1)
 	}
 	rawCert, err := base64.StdEncoding.DecodeString(getResponse[certRequestID].CertBlob)
 	if err != nil {
-		fmt.Println("Trouble base64 decoding response", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Trouble base64 decoding response: %s", err), 1)
 	}
 	pubKey, err := ssh.ParsePublicKey(rawCert)
 	if err != nil {
-		fmt.Println("Trouble parsing response", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Trouble parsing response: %s", err), 1)
 	}
 	cert := *pubKey.(*ssh.Certificate)
 	ssh_ca_util.PrintForInspection(cert)
@@ -133,7 +121,7 @@ func signCert(c *cli.Context) {
 	text, _ := reader.ReadString('\n')
 	text = strings.TrimSpace(text)
 	if text != "yes" && text != "reject" {
-		os.Exit(0)
+		return cli.NewExitError("", 0)
 	}
 	var operation OperationKind
 	if text == "yes" {
@@ -144,8 +132,7 @@ func signCert(c *cli.Context) {
 
 	err = cert.SignCert(rand.Reader, signer)
 	if err != nil {
-		fmt.Println("Error signing:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error signing: %s", err), 1)
 	}
 
 	request := ssh_ca_client.MakeSigningRequest(cert, certRequestID, config)
@@ -156,10 +143,10 @@ func signCert(c *cli.Context) {
 		err = request.DeleteToWeb(requestWebParameters)
 	}
 	if err != nil {
-		fmt.Println("Error sending in +1:", err)
-		os.Exit(1)
+		return cli.NewExitError(fmt.Sprintf("Error sending in +1: %s", err), 1)
 	} else {
 		fmt.Println("Signature accepted by server.")
 	}
+	return nil
 
 }
