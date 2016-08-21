@@ -204,13 +204,14 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 	requestIDStr := base32.StdEncoding.EncodeToString(requestID)
 	nextSerial := <-h.NextSerial
 
+	requesterFp := ssh_ca_util.MakeFingerprint(cert.SignatureKey.Marshal())
+
 	signed, err := h.saveSigningRequest(config, environment, reason, requestIDStr, nextSerial, cert)
 	if err != nil {
 		http.Error(rw, fmt.Sprintf("Request not made: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	requesterFp := ssh_ca_util.MakeFingerprint(cert.SignatureKey.Marshal())
 	log.Printf("Cert request serial %d id %s env %s from %s (%s) @ %s principals %v valid from %d to %d for '%s'\n",
 		cert.Serial, requestIDStr, environment, requesterFp, config.AuthorizedUsers[requesterFp],
 		req.RemoteAddr, cert.ValidPrincipals, cert.ValidAfter, cert.ValidBefore, reason)
@@ -614,11 +615,11 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) {
 	requestHandler.sshAgentConn = sshAgentConn
 	err = requestHandler.setupPrivateKeys(config)
 	if err != nil {
-		log.Println("Failed CA key load: %v\n", err)
+		log.Printf("Failed CA key load: %v\n", err)
 		os.Exit(1)
 	}
 
-	log.Println("Server started with config", config)
+	log.Printf("Server started with config %#v\n", config)
 
 	r := mux.NewRouter()
 	requests := r.Path("/cert/requests").Subrouter()
