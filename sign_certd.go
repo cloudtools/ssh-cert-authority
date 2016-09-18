@@ -226,10 +226,10 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 
 	var returnStatus int
 	if signed {
-		slackMsg := fmt.Sprintf("SSH cert request %s auto signed.", requestID)
+		slackMsg := fmt.Sprintf("SSH cert request %s auto signed.", requestIDStr)
 		err := ssh_ca_client.PostToSlack(config.SlackUrl, config.SlackChannel, slackMsg)
 		if err != nil {
-			log.Printf("Unable to post to slack for %s: %v", requestID, err)
+			log.Printf("Unable to post to slack for %s: %v", requestIDStr, err)
 		}
 		returnStatus = http.StatusAccepted
 	} else {
