@@ -315,6 +315,15 @@ Effectively the format is::
   indicate which users are allowed to sign requests.
 - ``AuthorizedUsers``: Same as ``AuthorizedSigners`` except that these are
   fingerprints of people allowed to submit requests.
+- ``CriticalOptions``: A hash of critical options to be added to all
+  certificate requests. By specifying these in your configuration file
+  all cert requests to this environment will have these options embedded
+  in them. You can use this option, for example, to restrict the IP
+  addresses that are allowed to use a certificate or to force a user
+  to only be able to run a single command. Those are the only two
+  options supported by sshd right now. This document describes them in
+  the section ``Critical options``:
+  http://cvsweb.openbsd.org/cgi-bin/cvsweb/src/usr.bin/ssh/PROTOCOL.certkeys?rev=HEAD
 
 The same users and fingerprints may appear in both ``AuthorizedSigners`` and
 ``AuthorizedUsers``.

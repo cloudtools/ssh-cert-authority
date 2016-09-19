@@ -22,6 +22,7 @@ type SignerdConfig struct {
 	MaxCertLifetime       int
 	PrivateKeyFile        string
 	KmsRegion             string
+	CriticalOptions       map[string]string
 }
 
 type SignerConfig struct {

@@ -30,6 +30,30 @@ import (
 	"time"
 )
 
+// Yanked from PROTOCOL.certkeys
+var supportedCriticalOptions = []string{
+	"force-command",
+	"source-address",
+}
+
+func isSupportedOption(x string) bool {
+	for optionIdx := range supportedCriticalOptions {
+		if supportedCriticalOptions[optionIdx] == x {
+			return true
+		}
+	}
+	return false
+}
+
+func areCriticalOptionsValid(criticalOptions map[string]string) error {
+	for optionName, _ := range criticalOptions {
+		if !isSupportedOption(optionName) {
+			return fmt.Errorf("Invalid critical option name: '%s'", optionName)
+		}
+	}
+	return nil
+}
+
 type certRequest struct {
 	// This struct tracks state for certificate requests. Imagine this one day
 	// being stored in a persistent data store.
@@ -192,11 +216,22 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 		http.Error(rw, "Unknown environment.", http.StatusBadRequest)
 		return
 	}
+
 	err = h.validateCert(cert, config.AuthorizedUsers)
 	if err != nil {
 		log.Printf("Invalid certificate signing request received from %s, ignoring", req.RemoteAddr)
 		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
+	}
+
+	// Ideally we put the critical options into the cert and let validateCert
+	// do the validation. However, this also checks the signature on the cert
+	// which would fail if we modified it prior to validation. So we validate
+	// by hand.
+	if len(config.CriticalOptions) > 0 {
+		for optionName, optionVal := range config.CriticalOptions {
+			cert.CriticalOptions[optionName] = optionVal
+		}
 	}
 
 	requestID := make([]byte, 10)
@@ -324,6 +359,8 @@ func (h *certRequestHandler) validateCert(cert *ssh.Certificate, authorizedSigne
 		_, ok := authorizedSigners[fingerprint]
 		return ok
 	}
+	certChecker.SupportedCriticalOptions = supportedCriticalOptions
+
 	err := certChecker.CheckCert(cert.ValidPrincipals[0], cert)
 	if err != nil {
 		err := fmt.Errorf("Cert not valid: %v", err)
@@ -583,6 +620,12 @@ func signCertd(c *cli.Context) error {
 	err := ssh_ca_util.LoadConfig(configPath, &config)
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("Load Config failed: %s", err), 1)
+	}
+	for envName, configObj := range config {
+		err = areCriticalOptionsValid(configObj.CriticalOptions)
+		if err != nil {
+			return cli.NewExitError(fmt.Sprintf("Error validation config for env '%s': %s", envName, err), 1)
+		}
 	}
 	err = runSignCertd(config)
 	return err

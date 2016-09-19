@@ -255,6 +255,28 @@ func TestSaveRequestInvalidCert(t *testing.T) {
 	}
 }
 
+func TestSaveRequestInvalidCriticalOptions(t *testing.T) {
+	allConfig := SetupSignerdConfig(1, 0)
+	environment := "testing"
+	envConfig := allConfig[environment]
+	envConfig.CriticalOptions = make(map[string]string)
+	envConfig.CriticalOptions["non-existent-critical"] = "yes"
+	if areCriticalOptionsValid(envConfig.CriticalOptions) == nil {
+		t.Fatalf("Should have found invalid critical option and didn't")
+	}
+}
+
+func TestSaveRequestValidCriticalOptions(t *testing.T) {
+	allConfig := SetupSignerdConfig(1, 0)
+	environment := "testing"
+	envConfig := allConfig[environment]
+	envConfig.CriticalOptions = make(map[string]string)
+	envConfig.CriticalOptions["force-command"] = "/bin/ls"
+	if areCriticalOptionsValid(envConfig.CriticalOptions) != nil {
+		t.Fatalf("Critical option is valid. But our test failed.")
+	}
+}
+
 func getTwoBoringCerts(t *testing.T) (*ssh.Certificate, *ssh.Certificate) {
 	pubKeyOne, _, _, _, err := ssh.ParseAuthorizedKey([]byte(boringUserCertString))
 	if err != nil {
