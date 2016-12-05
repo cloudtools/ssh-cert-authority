@@ -22,11 +22,11 @@ Here's a sample requester config file. The default location for this is
 ``$HOME/.ssh_ca/requester_config.json`` ::
     {
         "stage": {
-            "PublicKeyFingerprint": "17:04:57:a6:b8:49:94:ab:ca:0f:5e:60:8e:6d:e0:df",
+            "PublicKeyPath": "/Users/bob/.ssh/bvanzant-stage.pub",
             "SignerUrl": "http://ssh-ca:8080/"
         },
         "prod": {
-            "PublicKeyFingerprint": "00:f3:ce:02:e7:63:77:dc:65:be:c5:24:ee:1d:63:c0",
+            "PublicKeyPath": "/Users/bob.ssh/bvanzant-prod.pub",
             "SignerUrl": "http://ssh-ca:8080/"
         }
     }
@@ -90,6 +90,15 @@ get the fingerprint of the private key you want to sign with by doing
 ``ssh-keygen -l -f ~/.ssh/id_rsa`` or inspecting the output of ``ssh-add
 -l`` (the ``ssh-add -l`` output is only relevant if your private key is
 loaded in your agent).
+
+In recent versions of OpenSSH the fingerprint format has changed from
+MD5 (shown above) to sha256. If you fingerprint is not colon separated
+like above you need to tell OpenSSH to give you an MD5 fingerprint
+instead via the -E md5 option. For example: ``ssh-keygen -l -E md5 -f
+~/.ssh/id_rsa``. When passing in md5 do not include the "MD5:" prefix on
+the fingerprint.
+
+Github issue #23 is tracking supporting sha256 (and sha384, etc).
 
 Signing a request
 -----------------
