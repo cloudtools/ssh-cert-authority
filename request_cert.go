@@ -67,6 +67,10 @@ func requestCertFlags() []cli.Flag {
 			Name:  "quiet",
 			Usage: "Print only the request id on success",
 		},
+		cli.BoolTFlag{
+			Name:  "add-key",
+			Usage: "When set automatically call ssh-add if cert was auto-signed by server",
+		},
 	}
 }
 
@@ -156,12 +160,26 @@ func requestCert(c *cli.Context) error {
 
 	certRequest := newCert.Marshal()
 	requestParameters := caRequest.BuildWebRequest(certRequest)
-	requestID, err := caRequest.PostToWeb(requestParameters)
+	requestID, signed, err := caRequest.PostToWeb(requestParameters)
 	if err == nil {
 		if c.Bool("quiet") {
 			fmt.Println(requestID)
 		} else {
-			fmt.Printf("Cert request id: %s\n", requestID)
+			var appendage string
+			if signed {
+				appendage = " auto-signed"
+			}
+			fmt.Printf("Cert request id: %s%s\n", requestID, appendage)
+			if signed && c.BoolT("add-key") {
+				cert, err := downloadCert(config, requestID)
+				if err != nil {
+					return cli.NewExitError(fmt.Sprintf("%s", err), 1)
+				}
+				err = addCertToAgent(cert)
+				if err != nil {
+					return cli.NewExitError(fmt.Sprintf("%s", err), 1)
+				}
+			}
 		}
 	} else {
 		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
