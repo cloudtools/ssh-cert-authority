@@ -47,6 +47,9 @@ func getCert(c *cli.Context) error {
 
 	allConfig := make(map[string]ssh_ca_util.RequesterConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
+	if err != nil {
+		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
+	}
 	wrongTypeConfig, err := ssh_ca_util.GetConfigForEnv(environment, &allConfig)
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
