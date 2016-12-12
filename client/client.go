@@ -182,20 +182,21 @@ func (req *CertRequest) BuildWebRequest(signedCert []byte) url.Values {
 	return requestParameters
 }
 
-func (req *CertRequest) PostToWeb(requestParameters url.Values) (string, error) {
+func (req *CertRequest) PostToWeb(requestParameters url.Values) (string, bool, error) {
 	resp, err := http.PostForm(req.config.SignerUrl+"cert/requests", requestParameters)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	respBuf, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if resp.StatusCode == 201 || resp.StatusCode == 202 {
-		return string(respBuf), nil
+		signed := resp.StatusCode == 202
+		return string(respBuf), signed, nil
 	} else {
-		return "", fmt.Errorf("Cert request rejected: %s", string(respBuf))
+		return "", false, fmt.Errorf("Cert request rejected: %s", string(respBuf))
 	}
 }
 
