@@ -119,7 +119,6 @@ type certRequestHandler struct {
 	Config       map[string]ssh_ca_util.SignerdConfig
 	state        map[string]certRequest
 	sshAgentConn io.ReadWriter
-	NextSerial   chan uint64
 }
 
 type signingRequest struct {
@@ -234,10 +233,17 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 		}
 	}
 
-	requestID := make([]byte, 10)
+	requestID := make([]byte, 8)
 	rand.Reader.Read(requestID)
 	requestIDStr := base32.StdEncoding.EncodeToString(requestID)
-	nextSerial := <-h.NextSerial
+	requestIDStr = strings.Replace(requestIDStr, "=", "", 10)
+	// the serial number is the same as the request id, just encoded differently.
+	var nextSerial uint64
+	nextSerial = 0
+	for _, byteVal := range requestID {
+		nextSerial <<= 8
+		nextSerial |= uint64(byteVal)
+	}
 
 	requesterFp := ssh_ca_util.MakeFingerprint(cert.SignatureKey.Marshal())
 
@@ -247,6 +253,9 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 		return
 	}
 
+	// Serial and id are the same value, just encoded differently. Logging them
+	// both because they didn't use to be the same value and folks may be
+	// parsing these log messages and I don't want to break the format.
 	log.Printf("Cert request serial %d id %s env %s from %s (%s) @ %s principals %v valid from %d to %d for '%s'\n",
 		cert.Serial, requestIDStr, environment, requesterFp, config.AuthorizedUsers[requesterFp],
 		req.RemoteAddr, cert.ValidPrincipals, cert.ValidAfter, cert.ValidBefore, reason)
@@ -402,7 +411,7 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 		certRequestID = certRequestIDs[0]
 	}
 
-	matched, _ := regexp.MatchString("^[A-Z2-7=]{16}$", certRequestID)
+	matched, _ := regexp.MatchString("^[A-Z2-7=]{10,16}$", certRequestID)
 	if certRequestID != "" && !matched {
 		http.Error(rw, "Invalid certRequestId", http.StatusBadRequest)
 		return
@@ -635,13 +644,6 @@ func makeCertRequestHandler(config map[string]ssh_ca_util.SignerdConfig) certReq
 	var requestHandler certRequestHandler
 	requestHandler.Config = config
 	requestHandler.state = make(map[string]certRequest)
-	requestHandler.NextSerial = make(chan uint64)
-	go func() {
-		var serial uint64
-		for serial = 1; ; serial++ {
-			requestHandler.NextSerial <- serial
-		}
-	}()
 	return requestHandler
 }
 
