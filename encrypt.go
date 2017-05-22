@@ -10,14 +10,19 @@ import (
 	"encoding/pem"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/codegangsta/cli"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"os"
+	"regexp"
 )
+
+// If you update this regex know that despite my naming the match groups it's
+// the order that matters. See uses of keyIdRegex in this file and update
+// accordingly.
+var keyIdRegex = regexp.MustCompile("arn:aws:kms:(?P<region>[^:]+):(?P<accountid>[^:]+):(?P<keyname>[^:]+)")
 
 func encryptFlags() []cli.Flag {
 	return []cli.Flag{
@@ -72,11 +77,13 @@ func generateEcdsa() ([]byte, error) {
 }
 
 func cmdEncryptKey(c *cli.Context) error {
-	region, err := ec2metadata.New(session.New(), aws.NewConfig()).Region()
-	if err != nil {
-		return cli.NewExitError(fmt.Sprintf("Unable to determine our region: %s", err), 1)
-	}
+	var err error
 	keyId := c.String("key-id")
+	regexResults := keyIdRegex.FindStringSubmatch(keyId)
+	if regexResults == nil {
+		return cli.NewExitError("--key-id doesn't look like an AWS KMS ARN.", 1)
+	}
+	region := regexResults[1]
 
 	var ciphertext []byte
 	if c.Bool("generate-ecdsa") || c.Bool("generate-rsa") {
