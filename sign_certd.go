@@ -363,7 +363,7 @@ func (h *certRequestHandler) extractCertFromRequest(req *http.Request) (*ssh.Cer
 
 func (h *certRequestHandler) validateCert(cert *ssh.Certificate, authorizedSigners map[string]string) error {
 	var certChecker ssh.CertChecker
-	certChecker.IsAuthority = func(auth ssh.PublicKey) bool {
+	certChecker.IsUserAuthority = func(auth ssh.PublicKey) bool {
 		fingerprint := ssh_ca_util.MakeFingerprint(auth.Marshal())
 		_, ok := authorizedSigners[fingerprint]
 		return ok
