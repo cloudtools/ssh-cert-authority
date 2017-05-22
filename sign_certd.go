@@ -620,6 +620,11 @@ func signdFlags() []cli.Flag {
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
+		cli.StringFlag{
+			Name:  "listen-address",
+			Value: "127.0.0.1:8080",
+			Usage: "HTTP service address",
+		},
 	}
 }
 
@@ -636,7 +641,7 @@ func signCertd(c *cli.Context) error {
 			return cli.NewExitError(fmt.Sprintf("Error validation config for env '%s': %s", envName, err), 1)
 		}
 	}
-	err = runSignCertd(config)
+	err = runSignCertd(config, c.String("listen-address"))
 	return err
 }
 
@@ -647,7 +652,7 @@ func makeCertRequestHandler(config map[string]ssh_ca_util.SignerdConfig) certReq
 	return requestHandler
 }
 
-func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) error {
+func runSignCertd(config map[string]ssh_ca_util.SignerdConfig, addr string) error {
 	log.Println("Server running version", ssh_ca_util.BuildVersion)
 	log.Println("Using SSH agent at", os.Getenv("SSH_AUTH_SOCK"))
 
@@ -671,6 +676,6 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig) error {
 	request := r.Path("/cert/requests/{requestID}").Subrouter()
 	request.Methods("GET").HandlerFunc(requestHandler.getRequestStatus)
 	request.Methods("POST", "DELETE").HandlerFunc(requestHandler.signOrRejectRequest)
-	http.ListenAndServe(":8080", r)
+	http.ListenAndServe(addr, r)
 	return nil
 }
