@@ -71,12 +71,18 @@ func requestCertFlags() []cli.Flag {
 			Name:  "add-key",
 			Usage: "When set automatically call ssh-add if cert was auto-signed by server",
 		},
+		cli.StringFlag{
+			Name:  "ssh-dir",
+			Value: os.Getenv("HOME") + "/.ssh",
+			Usage: "Directory where SSH identity files (like 'id_rsa') reside",
+		},
 	}
 }
 
 func requestCert(c *cli.Context) error {
 	allConfig := make(map[string]ssh_ca_util.RequesterConfig)
 	configPath := c.String("config-file")
+	sshDir := c.String("ssh-dir")
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("Load Config failed: %s", err), 1)
@@ -171,11 +177,11 @@ func requestCert(c *cli.Context) error {
 			}
 			fmt.Printf("Cert request id: %s%s\n", requestID, appendage)
 			if signed && c.BoolT("add-key") {
-				cert, err := downloadCert(config, requestID)
+				cert, err := downloadCert(config, requestID, sshDir)
 				if err != nil {
 					return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 				}
-				err = addCertToAgent(cert)
+				err = addCertToAgent(cert, sshDir)
 				if err != nil {
 					return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 				}
