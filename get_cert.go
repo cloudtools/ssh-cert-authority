@@ -36,6 +36,11 @@ func getCertFlags() []cli.Flag {
 			Name:  "add-key",
 			Usage: "When set automatically call ssh-add",
 		},
+		cli.StringFlag{
+			Name:  "ssh-dir",
+			Value: os.Getenv("HOME") + "/.ssh",
+			Usage: "Directory where SSH identity files (like 'id_rsa') reside",
+		},
 	}
 }
 
@@ -43,6 +48,7 @@ func getCert(c *cli.Context) error {
 
 	configPath := c.String("config-file")
 	environment := c.String("environment")
+	sshDir := c.String("ssh-dir")
 	certRequestID := c.Args().First()
 
 	allConfig := make(map[string]ssh_ca_util.RequesterConfig)
@@ -55,12 +61,12 @@ func getCert(c *cli.Context) error {
 		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 	config := wrongTypeConfig.(ssh_ca_util.RequesterConfig)
-	cert, err := downloadCert(config, certRequestID)
+	cert, err := downloadCert(config, certRequestID, sshDir)
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 	if c.BoolT("add-key") {
-		err = addCertToAgent(cert)
+		err = addCertToAgent(cert, sshDir)
 		if err != nil {
 			return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 		}
@@ -68,12 +74,12 @@ func getCert(c *cli.Context) error {
 	return nil
 }
 
-func addCertToAgent(cert *ssh.Certificate) error {
+func addCertToAgent(cert *ssh.Certificate, sshDir string) error {
 	secondsRemaining := int64(cert.ValidBefore) - int64(time.Now().Unix())
 	if secondsRemaining < 1 {
 		return fmt.Errorf("This certificate has already expired.")
 	}
-	pubKeyPath, err := findKeyLocally(cert.Key)
+	pubKeyPath, err := findKeyLocally(cert.Key, sshDir)
 	privKeyPath := strings.Replace(pubKeyPath, ".pub", "", 1)
 	fmt.Printf("pubkey %s, privkey %s\n", pubKeyPath, privKeyPath)
 	cmd := exec.Command("ssh-add", "-t", fmt.Sprintf("%d", secondsRemaining), privKeyPath)
@@ -87,7 +93,7 @@ func addCertToAgent(cert *ssh.Certificate) error {
 	return nil
 }
 
-func downloadCert(config ssh_ca_util.RequesterConfig, certRequestID string) (*ssh.Certificate, error) {
+func downloadCert(config ssh_ca_util.RequesterConfig, certRequestID string, sshDir string) (*ssh.Certificate, error) {
 	getResp, err := http.Get(config.SignerUrl + "cert/requests/" + certRequestID)
 	if err != nil {
 		return nil, fmt.Errorf("Didn't get a valid response: %s", err)
@@ -107,7 +113,7 @@ func downloadCert(config ssh_ca_util.RequesterConfig, certRequestID string) (*ss
 	}
 	cert := pubKey.(*ssh.Certificate)
 
-	pubKeyPath, err := findKeyLocally(cert.Key)
+	pubKeyPath, err := findKeyLocally(cert.Key, sshDir)
 
 	if err != nil {
 		return nil, err
@@ -121,8 +127,8 @@ func downloadCert(config ssh_ca_util.RequesterConfig, certRequestID string) (*ss
 	ssh_ca_util.PrintForInspection(*cert)
 	return cert, nil
 }
-func findKeyLocally(key ssh.PublicKey) (string, error) {
-	sshDir := os.Getenv("HOME") + "/.ssh"
+
+func findKeyLocally(key ssh.PublicKey, sshDir string) (string, error) {
 	dirEntries, err := ioutil.ReadDir(sshDir)
 	if err != nil {
 		return "", fmt.Errorf("Could not read your .ssh directory %s: %s\n", sshDir, err)
