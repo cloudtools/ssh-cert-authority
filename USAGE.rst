@@ -36,6 +36,25 @@ blob containing a stage and prod environment. The user has chosen to use
 different SSH keys for production and staging, however, this is not
 required. The ``SignerUrl`` is the location of the ssh-cert-authority daemon.
 
+Generating this configuration file can be a little cumbersome. The
+``ssh-cert-authority`` program has a ``generate-config`` subcommand that
+tries to aid in generating this file. New users can run something like ::
+
+    ssh-cert-authority generate-config --url https://ssh-ca.example.com
+
+And that will do two things. First, it goes to ssh-ca.example.com and
+requests a listing of the server's configured environments (e.g. "stage"
+and "prod"). Second it creates the configuration file inserting
+https://ssh-ca.example.com as the SignerUrl and $HOME/.ssh/id_rsa.pub as
+the PublicKeyPath.
+
+The generated config file is printed to stdout. You can redirect or
+manually copy it into the default location of
+``~/.ssh_ca/requester_config.json``.
+
+Users using multiple SSH keys or keys other than id_rsa.pub will need to
+manually edit the configuration after it is generated.
+
 Making a request
 ----------------
 

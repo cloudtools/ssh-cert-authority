@@ -7,8 +7,8 @@ import (
 )
 
 type RequesterConfig struct {
-	PublicKeyPath        string
-	PublicKeyFingerprint string
+	PublicKeyPath        string `json:",omitempty"`
+	PublicKeyFingerprint string `json:",omitempty"`
 	SignerUrl            string
 }
 

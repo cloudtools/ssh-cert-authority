@@ -53,6 +53,12 @@ func main() {
 			Usage:  "Optionally generate and then encrypt an ssh private key",
 			Action: cmdEncryptKey,
 		},
+		{
+			Name:   "generate-config",
+			Flags:  generateConfigFlags(),
+			Usage:  "Try to generate a configuration file for a requester",
+			Action: cmdGenerateConfig,
+		},
 	}
 	app.Run(os.Args)
 }

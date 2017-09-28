@@ -397,6 +397,20 @@ func newResponseElement(certBlob string, signed bool, numSignatures, signaturesR
 	return element
 }
 
+func (h *certRequestHandler) listEnvironments(rw http.ResponseWriter, req *http.Request) {
+	environments := make([]string, 0)
+	for k, _ := range h.Config {
+		environments = append(environments, k)
+	}
+	result, err := json.Marshal(environments)
+	if err != nil {
+		http.Error(rw, fmt.Sprintf("Unable to marshal environment names: %v", err), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("List environments received from '%s'\n", req.RemoteAddr)
+	rw.Write(result)
+}
+
 func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *http.Request) {
 	var certRequestID string
 
@@ -676,6 +690,8 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig, addr string) erro
 	request := r.Path("/cert/requests/{requestID}").Subrouter()
 	request.Methods("GET").HandlerFunc(requestHandler.getRequestStatus)
 	request.Methods("POST", "DELETE").HandlerFunc(requestHandler.signOrRejectRequest)
+	environments := r.Path("/config/environments").Subrouter()
+	environments.Methods("GET").HandlerFunc(requestHandler.listEnvironments)
 	http.ListenAndServe(addr, r)
 	return nil
 }
