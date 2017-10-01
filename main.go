@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/cloudtools/ssh-cert-authority/util"
+	"github.com/cloudtools/ssh-cert-authority/version"
 	"github.com/codegangsta/cli"
 	"os"
 )
@@ -10,7 +10,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "ssh-cert-authority"
 	app.EnableBashCompletion = true
-	app.Version = ssh_ca_util.BuildVersion
+	app.Version = version.BuildVersion
 
 	app.Commands = []cli.Command{
 		{

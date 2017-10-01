@@ -54,7 +54,7 @@ func cmdGenerateConfig(c *cli.Context) error {
 		return cli.NewExitError(fmt.Sprintf("Error getting listing of environments: %s", string(getRespBuf)), 1)
 	}
 
-	environments := make([]string, 0)
+	var environments []string
 	json.Unmarshal(getRespBuf, &environments)
 
 	wholeConfig := make(map[string]ssh_ca_util.RequesterConfig, len(environments))

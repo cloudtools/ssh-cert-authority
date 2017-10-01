@@ -60,9 +60,8 @@ func (req *SigningRequest) PostToWeb(requestParameters url.Values) error {
 	if resp.StatusCode != 200 {
 		respBuf, _ := ioutil.ReadAll(resp.Body)
 		return fmt.Errorf("HTTP %s: %s", resp.Status, string(respBuf))
-	} else {
-		return nil
 	}
+	return nil
 }
 
 func (req *SigningRequest) DeleteToWeb(requestParameters url.Values) error {
@@ -81,9 +80,8 @@ func (req *SigningRequest) DeleteToWeb(requestParameters url.Values) error {
 	if resp.StatusCode != 200 {
 		respBuf, _ := ioutil.ReadAll(resp.Body)
 		return fmt.Errorf("HTTP %s: %s", resp.Status, string(respBuf))
-	} else {
-		return nil
 	}
+	return nil
 }
 
 func (req *CertRequest) SetConfig(config ssh_ca_util.RequesterConfig) error {
@@ -195,9 +193,8 @@ func (req *CertRequest) PostToWeb(requestParameters url.Values) (string, bool, e
 	if resp.StatusCode == 201 || resp.StatusCode == 202 {
 		signed := resp.StatusCode == 202
 		return string(respBuf), signed, nil
-	} else {
-		return "", false, fmt.Errorf("Cert request rejected: %s", string(respBuf))
 	}
+	return "", false, fmt.Errorf("Cert request rejected: %s", string(respBuf))
 }
 
 type SlackWebhookInput struct {
@@ -233,7 +230,6 @@ func PostToSlack(slackUrl, slackChannel, msg string) error {
 	}
 	if resp.StatusCode == 200 {
 		return nil
-	} else {
-		return fmt.Errorf("Slack post rejected: %s", string(respBuf))
 	}
+	return fmt.Errorf("Slack post rejected: %s", string(respBuf))
 }

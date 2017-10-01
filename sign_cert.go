@@ -144,9 +144,8 @@ func signCert(c *cli.Context) error {
 	}
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("Error sending in +1: %s", err), 1)
-	} else {
-		fmt.Println("Signature accepted by server.")
 	}
+	fmt.Println("Signature accepted by server.")
 	return nil
 
 }

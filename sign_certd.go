@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/cloudtools/ssh-cert-authority/client"
 	"github.com/cloudtools/ssh-cert-authority/util"
+	"github.com/cloudtools/ssh-cert-authority/version"
 	"github.com/codegangsta/cli"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/ssh"
@@ -46,7 +47,7 @@ func isSupportedOption(x string) bool {
 }
 
 func areCriticalOptionsValid(criticalOptions map[string]string) error {
-	for optionName, _ := range criticalOptions {
+	for optionName := range criticalOptions {
 		if !isSupportedOption(optionName) {
 			return fmt.Errorf("Invalid critical option name: '%s'", optionName)
 		}
@@ -398,8 +399,8 @@ func newResponseElement(certBlob string, signed bool, numSignatures, signaturesR
 }
 
 func (h *certRequestHandler) listEnvironments(rw http.ResponseWriter, req *http.Request) {
-	environments := make([]string, 0)
-	for k, _ := range h.Config {
+	var environments []string
+	for k := range h.Config {
 		environments = append(environments, k)
 	}
 	result, err := json.Marshal(environments)
@@ -667,7 +668,7 @@ func makeCertRequestHandler(config map[string]ssh_ca_util.SignerdConfig) certReq
 }
 
 func runSignCertd(config map[string]ssh_ca_util.SignerdConfig, addr string) error {
-	log.Println("Server running version", ssh_ca_util.BuildVersion)
+	log.Println("Server running version", version.BuildVersion)
 	log.Println("Using SSH agent at", os.Getenv("SSH_AUTH_SOCK"))
 
 	sshAgentConn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
