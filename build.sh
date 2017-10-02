@@ -1,13 +1,5 @@
 #!/bin/bash -e
 
 go get
-go test ./...
+make test ssh-cert-authority-linux-amd64.gz ssh-cert-authority-darwin-amd64.gz
 
-ARCHITECTURES=amd64
-OPERATING_SYSTEMS="linux darwin"
-for GOARCH in $ARCHITECTURES; do
-    for GOOS in $OPERATING_SYSTEMS; do
-        GOOS=$GOOS GOARCH=$GOARCH go build -o ssh-cert-authority-$GOOS-$GOARCH
-        gzip -f ssh-cert-authority-$GOOS-$GOARCH
-    done
-done

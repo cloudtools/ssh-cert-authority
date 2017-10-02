@@ -3,11 +3,30 @@ VERSION := $(shell echo `git describe --tags --long --match=*.*.* --dirty` | sed
 
 PKG=github.com/cloudtools/ssh-cert-authority
 
+.PHONY: test vet
+
+ssh-cert-authority:
+	go build -ldflags "-X ${PKG}/version.Tag=${TAG} -X ${PKG}/version.BuildVersion=${VERSION}" .
+
+ssh-cert-authority-linux-amd64:
+	GOOS=linux GOARCH=amd64 \
+		 go build -o ssh-cert-authority-linux-amd64 \
+		 	-ldflags "-X ${PKG}/version.Tag=${TAG} -X ${PKG}/version.BuildVersion=${VERSION}" .
+
+ssh-cert-authority-linux-amd64.gz: ssh-cert-authority-linux-amd64
+	gzip -f ssh-cert-authority-linux-amd64
+
+ssh-cert-authority-darwin-amd64:
+	GOOS=darwin GOARCH=amd64 \
+		 go build -o ssh-cert-authority-darwin-amd64 \
+		 	-ldflags "-X ${PKG}/version.Tag=${TAG} -X ${PKG}/version.BuildVersion=${VERSION}" .
+
+ssh-cert-authority-darwin-amd64.gz: ssh-cert-authority-darwin-amd64
+	gzip -f ssh-cert-authority-darwin-amd64
+
 test:
-	go test ./...
+	@go test ./...
 
 vet:
-	go vet ./...
+	@go vet ./...
 
-all: test
-	go build -ldflags "-X ${PKG}/version.Tag=${TAG} -X ${PKG}/version.BuildVersion=${VERSION}" .
