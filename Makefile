@@ -1,4 +1,4 @@
-TAG?=1.6.1
+TAG?=1.6.2
 VERSION := $(shell echo `git describe --tags --long --match=*.*.* --dirty` | sed s/version-//g)
 
 PKG=github.com/cloudtools/ssh-cert-authority
