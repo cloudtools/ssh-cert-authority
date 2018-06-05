@@ -381,20 +381,28 @@ func (h *certRequestHandler) validateCert(cert *ssh.Certificate, authorizedSigne
 
 type listResponseElement struct {
 	Signed             bool
+	Rejected           bool
 	CertBlob           string
 	NumSignatures      int
 	SignaturesRequired int
 	Serial             uint64
+	Environment        string
+	Reason             string
+	Cert               *ssh.Certificate
 }
 type certRequestResponse map[string]listResponseElement
 
-func newResponseElement(certBlob string, signed bool, numSignatures, signaturesRequired int, serial uint64) listResponseElement {
+func newResponseElement(cert *ssh.Certificate, certBlob string, signed bool, rejected bool, numSignatures, signaturesRequired int, serial uint64, reason string, environment string) listResponseElement {
 	var element listResponseElement
+	element.Cert = cert
 	element.CertBlob = certBlob
 	element.Signed = signed
+	element.Rejected = rejected
 	element.NumSignatures = numSignatures
 	element.SignaturesRequired = signaturesRequired
 	element.Serial = serial
+	element.Reason = reason
+	element.Environment = environment
 	return element
 }
 
@@ -438,7 +446,7 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 	results := make(certRequestResponse)
 	for k, v := range h.state {
 		encodedCert := base64.StdEncoding.EncodeToString(v.request.Marshal())
-		element := newResponseElement(encodedCert, v.certSigned, len(v.signatures), h.Config[v.environment].NumberSignersRequired, v.request.Serial)
+		element := newResponseElement(v.request, encodedCert, v.certSigned, v.certRejected, len(v.signatures), h.Config[v.environment].NumberSignersRequired, v.request.Serial, v.reason, v.environment)
 		// Two ways to use this URL. If caller specified a certRequestId
 		// then we return only that one. Otherwise everything.
 		if certRequestID == "" {
