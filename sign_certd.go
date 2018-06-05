@@ -16,6 +16,7 @@ import (
 	"github.com/cloudtools/ssh-cert-authority/util"
 	"github.com/cloudtools/ssh-cert-authority/version"
 	"github.com/codegangsta/cli"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -650,6 +651,11 @@ func signdFlags() []cli.Flag {
 			Value: "127.0.0.1:8080",
 			Usage: "HTTP service address",
 		},
+		cli.BoolFlag{
+			Name: "reverse-proxy",
+			Usage: "Set when service is behind a reverse proxy, like nginx",
+			EnvVar: "SSH_CERT_AUTHORITY_PROXY",
+		},
 	}
 }
 
@@ -666,7 +672,7 @@ func signCertd(c *cli.Context) error {
 			return cli.NewExitError(fmt.Sprintf("Error validation config for env '%s': %s", envName, err), 1)
 		}
 	}
-	err = runSignCertd(config, c.String("listen-address"))
+	err = runSignCertd(config, c.String("listen-address"), c.Bool("reverse-proxy"))
 	return err
 }
 
@@ -677,7 +683,7 @@ func makeCertRequestHandler(config map[string]ssh_ca_util.SignerdConfig) certReq
 	return requestHandler
 }
 
-func runSignCertd(config map[string]ssh_ca_util.SignerdConfig, addr string) error {
+func runSignCertd(config map[string]ssh_ca_util.SignerdConfig, addr string, is_proxied bool) error {
 	log.Println("Server running version", version.BuildVersion)
 	log.Println("Using SSH agent at", os.Getenv("SSH_AUTH_SOCK"))
 
@@ -703,6 +709,11 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig, addr string) erro
 	request.Methods("POST", "DELETE").HandlerFunc(requestHandler.signOrRejectRequest)
 	environments := r.Path("/config/environments").Subrouter()
 	environments.Methods("GET").HandlerFunc(requestHandler.listEnvironments)
-	http.ListenAndServe(addr, r)
+
+	if is_proxied {
+		http.ListenAndServe(addr, handlers.ProxyHeaders(r))
+	} else {
+		http.ListenAndServe(addr, r)
+	}
 	return nil
 }
