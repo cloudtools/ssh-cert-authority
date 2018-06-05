@@ -417,6 +417,7 @@ func (h *certRequestHandler) listEnvironments(rw http.ResponseWriter, req *http.
 		return
 	}
 	log.Printf("List environments received from '%s'\n", req.RemoteAddr)
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 	rw.Write(result)
 }
 
@@ -466,6 +467,7 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 			http.Error(rw, fmt.Sprintf("Trouble marshaling json response %v", err), http.StatusInternalServerError)
 			return
 		}
+		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 		rw.Write(output)
 	} else {
 		http.Error(rw, fmt.Sprintf("No certs found."), http.StatusNotFound)
