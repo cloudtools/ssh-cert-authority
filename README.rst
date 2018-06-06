@@ -356,6 +356,35 @@ You can take that value and add in your keys like so::
 
 Once the server is up and running it is bound to 0.0.0.0 on port 8080.
 
+Running behind a reverse proxy (e.g. nginx)
+-------------------------------------------
+
+If you're running behind a reverse proxy, which this project recommends,
+you will want to set one additional command line argument,
+``reverse-proxy``. You can instead set the environment variable
+SSH_CERT_AUTHORITY_PROXY=true if that is more your style. Setting this
+flag to true instructs the daemon to trust the X-Forwarded-For header
+that nginx will set and to use that IP address in log messages. Know
+that you must not set this value to true if you are not running behind a
+proxy as this allows a malicious user to control the value of the IP
+address that is put into your log files.
+
+Command Line Flags
+------------------
+
+- ``config-file``: The path to a config.json file. Used to override the
+  default of $HOME/.ssh_ca/sign_certd_config.json
+- ``listen-address``: Controls the bind address of the daemon. By
+  default we bind to localhost which means you will not be able to
+  connect to the daemon from hosts other than this one without using a
+  reverse proxy (e.g. nginx) in front of this daemon. A reverse proxy is
+  the recommended method for running this service in production.
+- ``reverse-proxy``: When specified the daemon will trust the
+  X-Forwarded-For header as added to requests by your reverse proxy.
+  This flag must not be set when you are not using a reverse proxy as it
+  permits a malicious user to control the IP address that is written to
+  log files.
+
 Encrypting a CA Key Using Amazon's KMS
 ======================================
 
