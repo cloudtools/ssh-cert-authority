@@ -16,6 +16,7 @@ import (
 	"github.com/cloudtools/ssh-cert-authority/util"
 	"github.com/cloudtools/ssh-cert-authority/version"
 	"github.com/codegangsta/cli"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -381,20 +382,28 @@ func (h *certRequestHandler) validateCert(cert *ssh.Certificate, authorizedSigne
 
 type listResponseElement struct {
 	Signed             bool
+	Rejected           bool
 	CertBlob           string
 	NumSignatures      int
 	SignaturesRequired int
 	Serial             uint64
+	Environment        string
+	Reason             string
+	Cert               *ssh.Certificate
 }
 type certRequestResponse map[string]listResponseElement
 
-func newResponseElement(certBlob string, signed bool, numSignatures, signaturesRequired int, serial uint64) listResponseElement {
+func newResponseElement(cert *ssh.Certificate, certBlob string, signed bool, rejected bool, numSignatures, signaturesRequired int, serial uint64, reason string, environment string) listResponseElement {
 	var element listResponseElement
+	element.Cert = cert
 	element.CertBlob = certBlob
 	element.Signed = signed
+	element.Rejected = rejected
 	element.NumSignatures = numSignatures
 	element.SignaturesRequired = signaturesRequired
 	element.Serial = serial
+	element.Reason = reason
+	element.Environment = environment
 	return element
 }
 
@@ -409,6 +418,7 @@ func (h *certRequestHandler) listEnvironments(rw http.ResponseWriter, req *http.
 		return
 	}
 	log.Printf("List environments received from '%s'\n", req.RemoteAddr)
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 	rw.Write(result)
 }
 
@@ -438,7 +448,7 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 	results := make(certRequestResponse)
 	for k, v := range h.state {
 		encodedCert := base64.StdEncoding.EncodeToString(v.request.Marshal())
-		element := newResponseElement(encodedCert, v.certSigned, len(v.signatures), h.Config[v.environment].NumberSignersRequired, v.request.Serial)
+		element := newResponseElement(v.request, encodedCert, v.certSigned, v.certRejected, len(v.signatures), h.Config[v.environment].NumberSignersRequired, v.request.Serial, v.reason, v.environment)
 		// Two ways to use this URL. If caller specified a certRequestId
 		// then we return only that one. Otherwise everything.
 		if certRequestID == "" {
@@ -458,6 +468,7 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 			http.Error(rw, fmt.Sprintf("Trouble marshaling json response %v", err), http.StatusInternalServerError)
 			return
 		}
+		rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 		rw.Write(output)
 	} else {
 		http.Error(rw, fmt.Sprintf("No certs found."), http.StatusNotFound)
@@ -640,6 +651,11 @@ func signdFlags() []cli.Flag {
 			Value: "127.0.0.1:8080",
 			Usage: "HTTP service address",
 		},
+		cli.BoolFlag{
+			Name: "reverse-proxy",
+			Usage: "Set when service is behind a reverse proxy, like nginx",
+			EnvVar: "SSH_CERT_AUTHORITY_PROXY",
+		},
 	}
 }
 
@@ -656,7 +672,7 @@ func signCertd(c *cli.Context) error {
 			return cli.NewExitError(fmt.Sprintf("Error validation config for env '%s': %s", envName, err), 1)
 		}
 	}
-	err = runSignCertd(config, c.String("listen-address"))
+	err = runSignCertd(config, c.String("listen-address"), c.Bool("reverse-proxy"))
 	return err
 }
 
@@ -667,7 +683,7 @@ func makeCertRequestHandler(config map[string]ssh_ca_util.SignerdConfig) certReq
 	return requestHandler
 }
 
-func runSignCertd(config map[string]ssh_ca_util.SignerdConfig, addr string) error {
+func runSignCertd(config map[string]ssh_ca_util.SignerdConfig, addr string, is_proxied bool) error {
 	log.Println("Server running version", version.BuildVersion)
 	log.Println("Using SSH agent at", os.Getenv("SSH_AUTH_SOCK"))
 
@@ -693,6 +709,11 @@ func runSignCertd(config map[string]ssh_ca_util.SignerdConfig, addr string) erro
 	request.Methods("POST", "DELETE").HandlerFunc(requestHandler.signOrRejectRequest)
 	environments := r.Path("/config/environments").Subrouter()
 	environments.Methods("GET").HandlerFunc(requestHandler.listEnvironments)
-	http.ListenAndServe(addr, r)
+
+	if is_proxied {
+		http.ListenAndServe(addr, handlers.ProxyHeaders(r))
+	} else {
+		http.ListenAndServe(addr, r)
+	}
 	return nil
 }
