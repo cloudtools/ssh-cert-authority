@@ -277,6 +277,34 @@ func TestSaveRequestValidCriticalOptions(t *testing.T) {
 	}
 }
 
+func TestValidateCert(t *testing.T) {
+	allConfig := SetupSignerdConfig(1, 0)
+	environment := "testing"
+	envConfig := allConfig[environment]
+	requestHandler := makeCertRequestHandler(allConfig)
+
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(boringUserCertString))
+	if err != nil {
+		t.Fatalf("Parsing canned cert failed: %v", err)
+	}
+	cert := pubKey.(*ssh.Certificate)
+
+	// test-user is *not* in the list of authorized signers
+
+	err = requestHandler.validateCert(cert, envConfig.AuthorizedSigners)
+
+	if err == nil {
+		t.Fatalf("Should have failed. Succeeded with: %v", err)
+	}
+
+	// test-user *is* in the list of authorized users
+
+	err = requestHandler.validateCert(cert, envConfig.AuthorizedUsers)
+	if err != nil {
+		t.Fatalf("Should have succeeded. Failed with: %v", err)
+	}
+}
+
 func getTwoBoringCerts(t *testing.T) (*ssh.Certificate, *ssh.Certificate) {
 	pubKeyOne, _, _, _, err := ssh.ParseAuthorizedKey([]byte(boringUserCertString))
 	if err != nil {
