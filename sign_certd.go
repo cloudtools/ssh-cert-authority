@@ -377,6 +377,18 @@ func (h *certRequestHandler) validateCert(cert *ssh.Certificate, authorizedSigne
 		err := fmt.Errorf("Cert not valid: %v", err)
 		return err
 	}
+
+	if cert.CertType != ssh.UserCert {
+		err = errors.New("Cert not valid: not a user certificate")
+		return err
+	}
+
+	// explicitly call IsUserAuthority
+	if !certChecker.IsUserAuthority(cert.SignatureKey) {
+		err = errors.New("Cert not valid: not signed by an authorized key")
+		return err
+	}
+
 	return nil
 }
 
