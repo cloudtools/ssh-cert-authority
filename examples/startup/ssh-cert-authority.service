@@ -1,0 +1,31 @@
+# Tested on debian jessie
+
+# Setting up:
+# cp examples/startup/ssh-cert-authority.service ~/.config/systemd/user/ssh-cert-authority.service
+# systemctl --user enable ssh-cert-authority
+# systemctl --user start ssh-cert-authority
+
+# Note: if you get a DBUS warning & are using sudo use '-E' to preserve environment
+
+[Unit]
+
+Description=ssh-cert-authority service
+After=network.target
+
+[Service]
+Type=simple
+Environment=SSH_AUTH_SOCK=%t/ssh-cert-authority.socket
+
+# substitute your own signing key for id_ecdsa
+# substitute your own GOPATH (or add to environment)
+ExecStart=/bin/bash -c "\
+            /usr/bin/ssh-agent -a $SSH_AUTH_SOCK; \
+            /usr/bin/ssh-add ~/.ssh/id_ecdsa; \
+            /usr/bin/ssh-agent $GOPATH/bin/ssh-cert-authority runserver"
+
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+
