@@ -29,6 +29,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -121,6 +122,7 @@ type certRequestHandler struct {
 	Config       map[string]ssh_ca_util.SignerdConfig
 	state        map[string]certRequest
 	sshAgentConn io.ReadWriter
+	stateMutex   sync.RWMutex
 }
 
 type signingRequest struct {
@@ -325,11 +327,15 @@ func (h *certRequestHandler) saveSigningRequest(config ssh_ca_util.SignerdConfig
 	if len(requestIDStr) < 12 {
 		return false, fmt.Errorf("Request id is too short to be useful.")
 	}
+	h.stateMutex.RLock()
 	_, ok = h.state[requestIDStr]
+	h.stateMutex.RUnlock()
 	if ok {
 		return false, fmt.Errorf("Request id '%s' already in use.", requestIDStr)
 	}
+	h.stateMutex.Lock()
 	h.state[requestIDStr] = certRequest
+	h.stateMutex.Unlock()
 
 	// This is the special case of supporting auto-signing.
 	if config.NumberSignersRequired < 0 {
@@ -401,7 +407,7 @@ type listResponseElement struct {
 	Serial             uint64
 	Environment        string
 	Reason             string
-	Cert               *ssh.Certificate
+	Cert               *ssh.Certificate `json:"-"`
 }
 type certRequestResponse map[string]listResponseElement
 
@@ -458,6 +464,8 @@ func (h *certRequestHandler) listPendingRequests(rw http.ResponseWriter, req *ht
 
 	foundSomething := false
 	results := make(certRequestResponse)
+	h.stateMutex.RLock()
+	defer h.stateMutex.RUnlock()
 	for k, v := range h.state {
 		encodedCert := base64.StdEncoding.EncodeToString(v.request.Marshal())
 		element := newResponseElement(v.request, encodedCert, v.certSigned, v.certRejected, len(v.signatures), h.Config[v.environment].NumberSignersRequired, v.request.Serial, v.reason, v.environment)
@@ -497,6 +505,8 @@ func (h *certRequestHandler) getRequestStatus(rw http.ResponseWriter, req *http.
 		certRejected bool
 		cert         string
 	}
+	h.stateMutex.RLock()
+	defer h.stateMutex.RUnlock()
 	if h.state[requestID].certSigned {
 		rw.Write([]byte(h.state[requestID].request.Type()))
 		rw.Write([]byte(" "))
@@ -511,7 +521,9 @@ func (h *certRequestHandler) getRequestStatus(rw http.ResponseWriter, req *http.
 
 func (h *certRequestHandler) signOrRejectRequest(rw http.ResponseWriter, req *http.Request) {
 	requestID := mux.Vars(req)["requestID"]
+	h.stateMutex.RLock()
 	originalRequest, ok := h.state[requestID]
+	h.stateMutex.RUnlock()
 	if !ok {
 		http.Error(rw, "Unknown request id", http.StatusNotFound)
 		return
@@ -555,7 +567,9 @@ func (h *certRequestHandler) signOrRejectRequest(rw http.ResponseWriter, req *ht
 	// Verifying that the cert being posted to us here matches the one in the
 	// request. That is, that an attacker isn't using an old signature to sign a
 	// new/different request id
+	h.stateMutex.RLock()
 	requestedCert := h.state[requestID].request
+	h.stateMutex.RUnlock()
 	if !compareCerts(requestedCert, signedCert) {
 		log.Printf("Signature was valid, but cert didn't match from %s.", req.RemoteAddr)
 		log.Printf("Orig req: %#v\n", requestedCert)
@@ -577,6 +591,8 @@ func (h *certRequestHandler) signOrRejectRequest(rw http.ResponseWriter, req *ht
 
 func (h *certRequestHandler) rejectRequest(requestID string, signerFp string, envConfig ssh_ca_util.SignerdConfig) error {
 	log.Printf("Reject received for id %s", requestID)
+	h.stateMutex.Lock()
+	defer h.stateMutex.Unlock()
 	stateInfo := h.state[requestID]
 	stateInfo.certRejected = true
 	// this is weird. see: https://code.google.com/p/go/issues/detail?id=3117
@@ -585,10 +601,15 @@ func (h *certRequestHandler) rejectRequest(requestID string, signerFp string, en
 }
 
 func (h *certRequestHandler) addConfirmation(requestID string, signerFp string, envConfig ssh_ca_util.SignerdConfig) error {
-	if h.state[requestID].certRejected {
+	h.stateMutex.RLock()
+	certRejected := h.state[requestID].certRejected
+	h.stateMutex.RUnlock()
+	if certRejected {
 		return fmt.Errorf("Attempt to sign a rejected cert.")
 	}
+	h.stateMutex.Lock()
 	h.state[requestID].signatures[signerFp] = true
+	h.stateMutex.Unlock()
 
 	if envConfig.SlackUrl != "" {
 		slackMsg := fmt.Sprintf("SSH cert %s signed by %s making %d/%d signatures.",
@@ -611,6 +632,8 @@ func (h *certRequestHandler) addConfirmation(requestID string, signerFp string, 
 }
 
 func (h *certRequestHandler) maybeSignWithCa(requestID string, numSignersRequired int, signingKeyFingerprint string) (bool, error) {
+	h.stateMutex.Lock()
+	defer h.stateMutex.Unlock()
 	if len(h.state[requestID].signatures) >= numSignersRequired {
 		if h.sshAgentConn == nil {
 			// This is used for testing. We're effectively disabling working
@@ -664,8 +687,8 @@ func signdFlags() []cli.Flag {
 			Usage: "HTTP service address",
 		},
 		cli.BoolFlag{
-			Name: "reverse-proxy",
-			Usage: "Set when service is behind a reverse proxy, like nginx",
+			Name:   "reverse-proxy",
+			Usage:  "Set when service is behind a reverse proxy, like nginx",
 			EnvVar: "SSH_CERT_AUTHORITY_PROXY",
 		},
 	}
