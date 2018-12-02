@@ -25,6 +25,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"regexp"
@@ -133,12 +134,24 @@ type signingRequest struct {
 
 func (h *certRequestHandler) setupPrivateKeys(config map[string]ssh_ca_util.SignerdConfig) error {
 	for env, cfg := range config {
-		if cfg.PrivateKeyFile != "" {
-			keyContents, err := ioutil.ReadFile(cfg.PrivateKeyFile)
+		if cfg.PrivateKeyFile == "" {
+			continue
+		}
+		keyUrl, err := url.Parse(cfg.PrivateKeyFile)
+		if err != nil {
+			log.Printf("Ignoring invalid private key file: '%s'. Error parsing: %s", cfg.PrivateKeyFile, err)
+			continue
+		}
+		if keyUrl.Scheme == "gcpkms" {
+			cfg = config[env]
+			cfg.SigningKeyFingerprint = cfg.PrivateKeyFile
+			config[env] = cfg
+		} else if keyUrl.Scheme == "" || keyUrl.Scheme == "file" {
+			keyContents, err := ioutil.ReadFile(keyUrl.Path)
 			if err != nil {
-				return fmt.Errorf("Failed reading private key file %s: %v", cfg.PrivateKeyFile, err)
+				return fmt.Errorf("Failed reading private key file %s: %v", keyUrl.Path, err)
 			}
-			if strings.HasSuffix(cfg.PrivateKeyFile, ".kms") {
+			if strings.HasSuffix(keyUrl.Path, ".kms") {
 				var region string
 				if cfg.KmsRegion != "" {
 					region = cfg.KmsRegion
@@ -163,21 +176,21 @@ func (h *certRequestHandler) setupPrivateKeys(config map[string]ssh_ca_util.Sign
 			}
 			key, err := ssh.ParseRawPrivateKey(keyContents)
 			if err != nil {
-				return fmt.Errorf("Failed parsing private key %s: %v", cfg.PrivateKeyFile, err)
+				return fmt.Errorf("Failed parsing private key %s: %v", keyUrl.Path, err)
 			}
 			keyToAdd := agent.AddedKey{
 				PrivateKey:   key,
-				Comment:      fmt.Sprintf("ssh-cert-authority-%s-%s", env, cfg.PrivateKeyFile),
+				Comment:      fmt.Sprintf("ssh-cert-authority-%s-%s", env, keyUrl.Path),
 				LifetimeSecs: 0,
 			}
 			agentClient := agent.NewClient(h.sshAgentConn)
 			err = agentClient.Add(keyToAdd)
 			if err != nil {
-				return fmt.Errorf("Unable to add private key %s: %v", cfg.PrivateKeyFile, err)
+				return fmt.Errorf("Unable to add private key %s: %v", keyUrl.Path, err)
 			}
 			signer, err := ssh.NewSignerFromKey(key)
 			if err != nil {
-				return fmt.Errorf("Unable to create signer from pk %s: %v", cfg.PrivateKeyFile, err)
+				return fmt.Errorf("Unable to create signer from pk %s: %v", keyUrl.Path, err)
 			}
 			keyFp := ssh_ca_util.MakeFingerprint(signer.PublicKey().Marshal())
 			log.Printf("Added private key for env %s: %s", env, keyFp)
@@ -644,7 +657,7 @@ func (h *certRequestHandler) maybeSignWithCa(requestID string, numSignersRequire
 		log.Printf("Received %d signatures for %s, signing now.\n", len(h.state[requestID].signatures), requestID)
 		signer, err := ssh_ca_util.GetSignerForFingerprint(signingKeyFingerprint, h.sshAgentConn)
 		if err != nil {
-			log.Printf("Couldn't find signing key for request %s, unable to sign request\n", requestID)
+			log.Printf("Couldn't find signing key for request %s, unable to sign request: %s\n", requestID, err)
 			return false, fmt.Errorf("Couldn't find signing key, unable to sign. Sorry.")
 		}
 		stateInfo := h.state[requestID]

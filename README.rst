@@ -2,16 +2,14 @@
 ssh-cert-authority
 ==================
 
-.. image:: https://drone.io/github.com/cloudtools/ssh-cert-authority/status.png
-
 Introduction
 ============
 
 A democratic SSH certificate authority.
 
 Operators of ssh-cert-authority want to use SSH certificates to provide
-fine-grained access control to servers they operate, keep their
-certificate signing key a secret and not need to be required to get
+fine-grained access control to servers they operate, enforce the 2-person rule,
+keep their certificate signing key a secret and not need to be required to get
 involved to actually sign certificates. A tall order.
 
 The idea here is that a user wishing to access a server runs
@@ -297,12 +295,18 @@ Effectively the format is::
   sign complete requests. This should be the fingerprint of your CA. When using
   this option you must, somehow, load the private key into the agent such that
   the daemon can use it.
-- ``PrivateKeyFile``: A path to a private key file. The key may be
-  unencrypted or have previously been encrypted using Amazon's KMS. If
-  the key was encrypted using KMS simply name it with a ".kms" extension
-  and ssh-cert-authority will attempt to decrypt the key on startup. See
-  the section on Encrypting a CA Key for help in using KMS to encrypt
-  the key.
+- ``PrivateKeyFile``: A path to a private key file or a Google KMS key url.
+
+  If you have specified a file system path the key may be unencrypted or have
+  previousl been encrypted using Amazon's KMS. If the key was encrypted using
+  KMS simply name it with a ".kms" extension and ssh-cert-authority will
+  attempt to decrypt the key on startup. See the section on Encrypting a CA Key
+  for help in using KMS to encrypt the key.
+
+  If you specified a Google KMS key it should be of the form:
+  ``gcpkms:///projects/<project-name>/locations/<region|global>/keyRings/<keyring
+  name>/cryptoKeys/<keyname>/cryptoKeyVersions/<version-number>``
+
 - ``KmsRegion``: If sign_certd encounters a privatekey file with an
   extension of ".kms" it will attempt to decrypt it using KMS in the
   same region that the software is running in. It determines this using
@@ -384,6 +388,71 @@ Command Line Flags
   This flag must not be set when you are not using a reverse proxy as it
   permits a malicious user to control the IP address that is written to
   log files.
+
+Storing Your CA Signing Key in Google Cloud
+===========================================
+Google Cloud KMS supports signing operations and ssh-cert-authority can use
+these keys to sign the SSH certificates it issues. If you do this you'll likely
+want to have your ssh-cert-authority running on an instance in GCP and
+configured with a service account that can use the key.
+
+ssh-cert-authority has been tested with ecdsa keys from prime256v1 both
+software and hardware backed. Other key kinds and curves might work.
+
+This example assumes you have a functioning gcloud already.
+
+Setting up keys::
+
+  # First create a keyring to store keys
+  gcloud kms keyrings create ssh-cert-authority-demo --location us-central1
+
+  # Create keys on that keyring for dev and prod
+  gcloud alpha kms keys create --purpose asymmetric-signing --keyring ssh-cert-authority-demo \
+    --location us-central1 --default-algorithm ec-sign-p256-sha256 dev
+  gcloud alpha kms keys create --purpose asymmetric-signing --keyring ssh-cert-authority-demo \
+    --location us-central1 --default-algorithm ec-sign-p256-sha256 prod
+
+  # Create a service account for the system
+  gcloud iam service-accounts create ssh-cert-authority-demo
+
+  # If you're using a GCP instance you should launch your instance and specify
+  # that service account as the account for the instance. If you're running
+  # this on a local machine or an AWS instance or something you will need to
+  # explicitly get the service account key
+  gcloud iam service-accounts keys create ssh-cert-authority-demo-serviceaccount.json
+      --iam-account ssh-cert-authority-demo@YOUR_GOOGLE_PROJECT_ID.iam.gserviceaccount.com
+  
+  # You need to set that key file in an environment variable now:
+  export GOOGLE_APPLICATION_CREDENTIALS=/path/to/ssh-cert-authority-demo-serviceaccount.json
+
+  # Give that service account permission to use our newly created keys:
+  gcloud kms keys add-iam-policy-binding  ssh-cert-authority-dev-hsm --location us-central1 \
+      --keyring ssh-cert-authority-demo \
+      --member serviceAccount:ssh-cert-authority-demo@YOUR_GOOGLE_PROJECT_ID.iam.gserviceaccount.com \
+      --role roles/cloudkms.signerVerifier
+
+  # Get the path to the keys we created:
+  gcloud kms keys list --location us-central1 --keyring ssh-cert-authority-demo
+
+  # That will print out the two keys we created earlier including the name of
+  # the key. The name of the key is a big path that begins with projects/. We
+  # need to copy this entire path into our sign_certd_config.json as the
+  # PrivateKeyFile for the environment. A minimal example showing only dev:
+  
+  {
+    "dev": {
+        "NumberSignersRequired": -1,
+        "MaxCertLifetime": 86400,
+        "PrivateKeyFile": "gcpkms:///projects/YOUR_GOOGLE_PROJECT_ID/locations/us-central1/keyRings/ssh-cert-authority-demo/cryptoKeys/dev/cryptoKeyVersions/1",
+        "AuthorizedSigners": {
+            "a7:64:9e:35:5d:ae:c6:bd:79:f1:e3:c8:92:0b:9a:51": "bvz"
+        },
+        "AuthorizedUsers": {
+            "a7:64:9e:35:5d:ae:c6:bd:79:f1:e3:c8:92:0b:9a:51": "bvz"
+        }
+    }
+  }
+
 
 Encrypting a CA Key Using Amazon's KMS
 ======================================
