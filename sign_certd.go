@@ -655,7 +655,7 @@ func (h *certRequestHandler) maybeSignWithCa(requestID string, numSignersRequire
 			return true, nil
 		}
 		log.Printf("Received %d signatures for %s, signing now.\n", len(h.state[requestID].signatures), requestID)
-		signer, err := ssh_ca_util.GetSignerForFingerprint(signingKeyFingerprint, h.sshAgentConn)
+		signer, err := ssh_ca_util.GetSignerForFingerprintOrUrl(signingKeyFingerprint, h.sshAgentConn)
 		if err != nil {
 			log.Printf("Couldn't find signing key for request %s, unable to sign request: %s\n", requestID, err)
 			return false, fmt.Errorf("Couldn't find signing key, unable to sign. Sorry.")
