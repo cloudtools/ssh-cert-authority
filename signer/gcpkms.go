@@ -60,7 +60,7 @@ func NewGcpKmsSigner(keyUrl string) (*GcpKmsSigner, error) {
 	return kmsSigner, nil
 }
 
-// PublicKey returns an associated PublicKey instance.
+// Public returns an associated PublicKey instance.
 func (g GcpKmsSigner) Public() crypto.PublicKey {
 	return g.kmsPubKey
 }
