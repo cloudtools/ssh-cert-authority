@@ -10,7 +10,6 @@ type RequesterConfig struct {
 	PublicKeyPath        string `json:",omitempty"`
 	PublicKeyFingerprint string `json:",omitempty"`
 	SignerUrl            string
-	DefaultAddKey		 bool    
 }
 
 type SignerdConfig struct {
