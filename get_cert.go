@@ -32,9 +32,10 @@ func getCertFlags() []cli.Flag {
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
-		cli.BoolTFlag{
+		cli.BoolFlag{
 			Name:  "add-key",
 			Usage: "When set automatically call ssh-add",
+			Value: false,
 		},
 		cli.StringFlag{
 			Name:  "ssh-dir",
@@ -65,7 +66,7 @@ func getCert(c *cli.Context) error {
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
-	if c.BoolT("add-key") {
+	if c.Bool("add-key") {
 		err = addCertToAgent(cert, sshDir)
 		if err != nil {
 			return cli.NewExitError(fmt.Sprintf("%s", err), 1)
