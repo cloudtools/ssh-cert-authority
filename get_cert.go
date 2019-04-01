@@ -119,6 +119,7 @@ func downloadCert(config ssh_ca_util.RequesterConfig, certRequestID string, sshD
 		return nil, err
 	}
 	pubKeyPath = strings.Replace(pubKeyPath, ".pub", "-cert.pub", 1)
+	fmt.Printf("%s\n", getRespBuf)
 	err = ioutil.WriteFile(pubKeyPath, getRespBuf, 0644)
 	if err != nil {
 		fmt.Printf("Couldn't write certificate file to %s: %s\n", pubKeyPath, err)
