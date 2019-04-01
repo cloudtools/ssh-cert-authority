@@ -65,7 +65,7 @@ func getCert(c *cli.Context) error {
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
-	if c.Bool("add-key") {
+	if c.BoolF("add-key") {
 		err = addCertToAgent(cert, sshDir)
 		if err != nil {
 			return cli.NewExitError(fmt.Sprintf("%s", err), 1)
