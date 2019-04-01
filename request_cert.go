@@ -67,7 +67,7 @@ func requestCertFlags() []cli.Flag {
 			Name:  "quiet",
 			Usage: "Print only the request id on success",
 		},
-		cli.BoolTFlag{
+		cli.BoolFlag{
 			Name:  "add-key",
 			Usage: "When set automatically call ssh-add if cert was auto-signed by server",
 		},
@@ -176,7 +176,7 @@ func requestCert(c *cli.Context) error {
 				appendage = " auto-signed"
 			}
 			fmt.Printf("Cert request id: %s%s\n", requestID, appendage)
-			if signed && c.BoolT("add-key") {
+			if signed && c.Bool("add-key") {
 				cert, err := downloadCert(config, requestID, sshDir)
 				if err != nil {
 					return cli.NewExitError(fmt.Sprintf("%s", err), 1)
