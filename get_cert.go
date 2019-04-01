@@ -35,7 +35,6 @@ func getCertFlags() []cli.Flag {
 		cli.BoolFlag{
 			Name:  "add-key",
 			Usage: "When set automatically call ssh-add",
-			Value: false,
 		},
 		cli.StringFlag{
 			Name:  "ssh-dir",
