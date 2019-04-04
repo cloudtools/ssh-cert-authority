@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"net"
 )
 
 func getCertFlags() []cli.Flag {
@@ -94,6 +95,46 @@ func addCertToAgent(cert *ssh.Certificate, sshDir string) error {
 }
 
 func downloadCert(config ssh_ca_util.RequesterConfig, certRequestID string, sshDir string) (*ssh.Certificate, error) {
+	// new stuff to try and set up ssh tunnel
+	fmt.Printf("starting tunnel config...\n")
+	localEndpoint := &ssh_ca_util.Endpoint{
+		Host: "localhost",
+		Port: 8080,
+	}
+
+	serverEndpoint := &ssh_ca_util.Endpoint{
+		Host: "bsdtest.potatohead.ca",
+		Port: 22,
+	}
+
+	remoteEndpoint := &ssh_ca_util.Endpoint{
+		Host: "localhost",
+		Port: 8080,
+	}
+
+	sshConfig := &ssh.ClientConfig{
+		User: "david",
+		Auth: []ssh.AuthMethod{
+			ssh_ca_util.SSHAgent(),
+		},
+		// TODO: fix this to actually check the trusted hosts
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+            return nil
+        },
+	}
+
+	tunnel := &ssh_ca_util.SSHtunnel{
+		Config: sshConfig,
+		Local:  localEndpoint,
+		Server: serverEndpoint,
+		Remote: remoteEndpoint,
+	}
+	
+	fmt.Printf("starting tunnel...\n")
+	go tunnel.Start()
+	
+	fmt.Printf("doing normal stuff...\n")
+	// end new stuff
 	getResp, err := http.Get(config.SignerUrl + "cert/requests/" + certRequestID)
 	if err != nil {
 		return nil, fmt.Errorf("Didn't get a valid response: %s", err)
