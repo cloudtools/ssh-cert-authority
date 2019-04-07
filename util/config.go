@@ -10,6 +10,7 @@ type RequesterConfig struct {
 	PublicKeyPath        string `json:",omitempty"`
 	PublicKeyFingerprint string `json:",omitempty"`
 	SignerUrl            string
+	SshBastion			 string `json:",omitempty"`
 }
 
 type SignerdConfig struct {
