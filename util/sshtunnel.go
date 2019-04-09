@@ -34,11 +34,14 @@ type SSHtunnel struct {
 	Config *ssh.ClientConfig
 }
 
-func (tunnel *SSHtunnel) Start() error {
+func (tunnel *SSHtunnel) Start(out_port chan int) error {
 	listener, err := net.Listen("tcp", tunnel.Local.String())
 	if err != nil {
 		return err
 	}
+	//fmt.Println("Using local port:", listener.Addr().(*net.TCPAddr).Port)
+	//tunnel.LocalPort = listener.Addr().(*net.TCPAddr).Port
+	out_port <- listener.Addr().(*net.TCPAddr).Port
 	defer listener.Close()
 
 	for {
@@ -81,7 +84,7 @@ func SSHAgent() ssh.AuthMethod {
 	return nil
 }
 
-func StartTunnelIfNeeded(config RequesterConfig) {
+func StartTunnelIfNeeded(config *RequesterConfig) {
 	if len(config.SshBastion) > 0 {
 		
 		if !strings.HasPrefix(config.SshBastion, "ssh://") {
@@ -121,11 +124,11 @@ func StartTunnelIfNeeded(config RequesterConfig) {
 			fmt.Printf("strconv.Atoi error: %s", err)
 		}
 		
-		fmt.Printf("config stuff: %s, %d\n", host_parts[0], ssh_port)
-		fmt.Printf("starting tunnel config...\n")
+		//fmt.Printf("config stuff: %s, %d\n", host_parts[0], ssh_port)
+		//fmt.Printf("starting tunnel config...\n")
 		localEndpoint := &Endpoint{
 			Host: "localhost",
-			Port: 8080,
+			Port: 0,
 		}
 
 		serverEndpoint := &Endpoint{
@@ -139,7 +142,7 @@ func StartTunnelIfNeeded(config RequesterConfig) {
 		}
 
 		sshConfig := &ssh.ClientConfig{
-			User: bastion_parsed.User,
+			User: bastion_parsed.User.Username(),
 			Auth: []ssh.AuthMethod{
 				SSHAgent(),
 			},
@@ -157,43 +160,19 @@ func StartTunnelIfNeeded(config RequesterConfig) {
 			Remote: remoteEndpoint,
 		}
 		
-		fmt.Printf("starting tunnel...\n")
-		go tunnel.Start()
+		//fmt.Printf("starting tunnel...\n")
 		
-		fmt.Printf("doing normal stuff...\n")
+		out_port_chan := make(chan int)
+		go tunnel.Start(out_port_chan)
+		var local_port int
+		local_port = <- out_port_chan
+		//fmt.Printf("Using local port: %d\n", local_port)
+		
+		//fmt.Printf("doing normal stuff...\n")
+		
+		config.SignerUrl = fmt.Sprintf("%s://localhost:%d/", remote_parsed.Scheme, local_port)
+		//fmt.Printf("sshtunnel using signer url: %s", config.SignerUrl)
 		// end new stuff
 	}
 }
 
-//func main() {
-	//localEndpoint := &Endpoint{
-		//Host: "localhost",
-		//Port: 9000,
-	//}
-
-	//serverEndpoint := &Endpoint{
-		//Host: "example.com",
-		//Port: 22,
-	//}
-
-	//remoteEndpoint := &Endpoint{
-		//Host: "localhost",
-		//Port: 8080,
-	//}
-
-	//sshConfig := &ssh.ClientConfig{
-		//User: "vcap",
-		//Auth: []ssh.AuthMethod{
-			//SSHAgent(),
-		//},
-	//}
-
-	//tunnel := &SSHtunnel{
-		//Config: sshConfig,
-		//Local:  localEndpoint,
-		//Server: serverEndpoint,
-		//Remote: remoteEndpoint,
-	//}
-
-	//tunnel.Start()
-//}	

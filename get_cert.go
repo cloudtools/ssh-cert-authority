@@ -94,7 +94,8 @@ func addCertToAgent(cert *ssh.Certificate, sshDir string) error {
 }
 
 func downloadCert(config ssh_ca_util.RequesterConfig, certRequestID string, sshDir string) (*ssh.Certificate, error) {
-	ssh_ca_util.StartTunnelIfNeeded(config)
+	ssh_ca_util.StartTunnelIfNeeded(&config)
+	//fmt.Printf("get_cert downloadCert using signer url: %s", config.SignerUrl)
 	
 	getResp, err := http.Get(config.SignerUrl + "cert/requests/" + certRequestID)
 	if err != nil {
