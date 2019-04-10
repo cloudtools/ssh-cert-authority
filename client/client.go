@@ -32,10 +32,10 @@ func MakeCertRequest() CertRequest {
 type SigningRequest struct {
 	signedCert ssh.Certificate
 	requestID  string
-	config     ssh_ca_util.SignerConfig
+	config     ssh_ca_util.RequesterConfig
 }
 
-func MakeSigningRequest(cert ssh.Certificate, requestID string, config ssh_ca_util.SignerConfig) SigningRequest {
+func MakeSigningRequest(cert ssh.Certificate, requestID string, config ssh_ca_util.RequesterConfig) SigningRequest {
 	var request SigningRequest
 	request.signedCert = cert
 	request.requestID = requestID

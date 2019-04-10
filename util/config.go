@@ -11,6 +11,7 @@ type RequesterConfig struct {
 	PublicKeyFingerprint string `json:",omitempty"`
 	SignerUrl            string
 	SshBastion			 string `json:",omitempty"`
+	KeyFingerprint       string `json:",omitempty"`
 }
 
 type SignerdConfig struct {
@@ -26,11 +27,6 @@ type SignerdConfig struct {
 	CriticalOptions       map[string]string
 }
 
-type SignerConfig struct {
-	KeyFingerprint string
-	SignerUrl      string
-}
-
 func LoadConfig(configPath string, environmentConfigs interface{}) error {
 	buf, err := ioutil.ReadFile(configPath)
 	if err != nil {
@@ -38,7 +34,7 @@ func LoadConfig(configPath string, environmentConfigs interface{}) error {
 	}
 
 	switch configType := environmentConfigs.(type) {
-	case *map[string]RequesterConfig, *map[string]SignerConfig, *map[string]SignerdConfig:
+	case *map[string]RequesterConfig, *map[string]SignerdConfig:
 		return json.Unmarshal(buf, &environmentConfigs)
 	default:
 		return fmt.Errorf("oops: %T\n", configType)
@@ -57,24 +53,10 @@ func GetConfigForEnv(environment string, environmentConfigs interface{}) (interf
 				// lame way of extracting first and only key from a map?
 			}
 		}
+		
 		config, ok := configs[environment]
 		if !ok {
-			return nil, fmt.Errorf("Requested environment not found in config file.")
-		}
-		return config, nil
-	case *map[string]SignerConfig:
-		configs := *environmentConfigs.(*map[string]SignerConfig)
-		if len(configs) > 1 && environment == "" {
-			return nil, fmt.Errorf("You must tell me which environment to use.")
-		}
-		if len(configs) == 1 && environment == "" {
-			for environment = range configs {
-				// lame way of extracting first and only key from a map?
-			}
-		}
-		config, ok := configs[environment]
-		if !ok {
-			return nil, fmt.Errorf("Requested environment not found in config file.")
+			return nil, fmt.Errorf("Requested environment not found in config file1.")
 		}
 		return config, nil
 	}

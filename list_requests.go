@@ -18,7 +18,7 @@ func listCertFlags() []cli.Flag {
 	if home == "" {
 		home = "/"
 	}
-	configPath := home + "/.ssh_ca/signer_config.json"
+	configPath := home + "/.ssh_ca/requester_config.json"
 
 	return []cli.Flag{
 		cli.StringFlag{
@@ -51,6 +51,8 @@ func listCerts(c *cli.Context) error {
 		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
 	config := wrongTypeConfig.(ssh_ca_util.RequesterConfig)
+	
+	ssh_ca_util.StartTunnelIfNeeded(&config)
 
 	getResp, err := http.Get(config.SignerUrl + "cert/requests")
 	if err != nil {
