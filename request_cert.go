@@ -68,8 +68,8 @@ func requestCertFlags() []cli.Flag {
 			Usage: "Print only the request id on success",
 		},
 		cli.BoolFlag{
-			Name:  "add-key",
-			Usage: "When set automatically call ssh-add if cert was auto-signed by server",
+			Name:  "no-get-key",
+			Usage: "When set don't automatically download the key",
 		},
 		cli.StringFlag{
 			Name:  "ssh-dir",
@@ -178,15 +178,12 @@ func requestCert(c *cli.Context) error {
 				appendage = " auto-signed"
 			}
 			fmt.Printf("Cert request id: %s%s\n", requestID, appendage)
-			if signed && c.Bool("add-key") {
-				cert, err := downloadCert(config, requestID, sshDir)
+			if signed && !c.Bool("no-get-key") {
+				_, err := downloadCert(config, requestID, sshDir)
 				if err != nil {
 					return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 				}
-				err = addCertToAgent(cert, sshDir)
-				if err != nil {
-					return cli.NewExitError(fmt.Sprintf("%s", err), 1)
-				}
+				// add cert to agent didn't seem to work and seemed unnecessary
 			}
 		}
 	} else {
