@@ -28,7 +28,7 @@ func getCertFlags() []cli.Flag {
 			Usage: "An environment name (e.g. prod)",
 		},
 		cli.StringFlag{
-			Name:  "config-file",
+			Name:  "config-file, c",
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
