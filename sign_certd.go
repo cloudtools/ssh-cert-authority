@@ -263,6 +263,10 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 	}
 
 	requesterFp := ssh_ca_util.MakeFingerprint(cert.SignatureKey.Marshal())
+	authorizedUsername, ok := config.AuthorizedUsers[requesterFp]
+	if !ok {
+		authorizedUsername, ok = config.AuthorizedUsers["*"]
+	} 
 
 	signed, err := h.saveSigningRequest(config, environment, reason, requestIDStr, nextSerial, cert)
 	if err != nil {
@@ -274,11 +278,11 @@ func (h *certRequestHandler) createSigningRequest(rw http.ResponseWriter, req *h
 	// both because they didn't use to be the same value and folks may be
 	// parsing these log messages and I don't want to break the format.
 	log.Printf("Cert request serial %d id %s env %s from %s (%s) @ %s principals %v valid from %d to %d for '%s'\n",
-		cert.Serial, requestIDStr, environment, requesterFp, config.AuthorizedUsers[requesterFp],
+		cert.Serial, requestIDStr, environment, requesterFp, authorizedUsername,
 		req.RemoteAddr, cert.ValidPrincipals, cert.ValidAfter, cert.ValidBefore, reason)
 
 	if config.SlackUrl != "" {
-		slackMsg := fmt.Sprintf("SSH cert request from %s with id %s for %s", config.AuthorizedUsers[requesterFp], requestIDStr, reason)
+		slackMsg := fmt.Sprintf("SSH cert request from %s with id %s for %s", authorizedUsername, requestIDStr, reason)
 		err = ssh_ca_client.PostToSlack(config.SlackUrl, config.SlackChannel, slackMsg)
 		if err != nil {
 			log.Printf("Unable to post to slack: %v", err)
@@ -315,9 +319,14 @@ func (h *certRequestHandler) saveSigningRequest(config ssh_ca_util.SignerdConfig
 	// We override keyid here so that its a server controlled value. Instead of
 	// letting a requester attempt to spoof it.
 	var ok bool
+	var supportsWildCard bool
 	cert.KeyId, ok = config.AuthorizedUsers[requesterFp]
+	wildCardKeyId, supportsWildCard := config.AuthorizedUsers["*"]
 	if !ok {
-		return false, fmt.Errorf("Requester fingerprint (%s) not found in config", requesterFp)
+		if !supportsWildCard {
+			return false, fmt.Errorf("Requester fingerprint (%s) not found in config", requesterFp)
+		}
+		cert.KeyId = wildCardKeyId
 	}
 
 	if requestSerial == 0 {
@@ -387,6 +396,9 @@ func (h *certRequestHandler) validateCert(cert *ssh.Certificate, authorizedSigne
 	certChecker.IsUserAuthority = func(auth ssh.PublicKey) bool {
 		fingerprint := ssh_ca_util.MakeFingerprint(auth.Marshal())
 		_, ok := authorizedSigners[fingerprint]
+		if !ok {
+			_, ok = authorizedSigners["*"]
+		}
 		return ok
 	}
 	certChecker.SupportedCriticalOptions = supportedCriticalOptions
@@ -576,6 +588,10 @@ func (h *certRequestHandler) signOrRejectRequest(rw http.ResponseWriter, req *ht
 	}
 
 	signerFp := ssh_ca_util.MakeFingerprint(signedCert.SignatureKey.Marshal())
+	signerUsername, ok := envConfig.AuthorizedSigners[signerFp]
+	if !ok {
+		signerUsername = envConfig.AuthorizedSigners["*"]
+	}
 
 	// Verifying that the cert being posted to us here matches the one in the
 	// request. That is, that an attacker isn't using an old signature to sign a
@@ -591,7 +607,7 @@ func (h *certRequestHandler) signOrRejectRequest(rw http.ResponseWriter, req *ht
 		return
 	}
 	log.Printf("Signature for serial %d id %s received from %s (%s) @ %s and determined valid\n",
-		signedCert.Serial, requestID, signerFp, envConfig.AuthorizedSigners[signerFp], req.RemoteAddr)
+		signedCert.Serial, requestID, signerFp, signerUsername, req.RemoteAddr)
 	if req.Method == "POST" {
 		err = h.addConfirmation(requestID, signerFp, envConfig)
 	} else {
