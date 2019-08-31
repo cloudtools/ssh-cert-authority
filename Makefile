@@ -1,4 +1,4 @@
-TAG?=1.7.1
+TAG?=2.0.0
 VERSION := $(shell echo `git describe --tags --long --match=*.*.* --dirty` | sed s/version-//g)
 
 PKG=github.com/cloudtools/ssh-cert-authority
@@ -23,6 +23,8 @@ ssh-cert-authority-darwin-amd64:
 
 ssh-cert-authority-darwin-amd64.gz: ssh-cert-authority-darwin-amd64
 	gzip -f ssh-cert-authority-darwin-amd64
+
+release: ssh-cert-authority-darwin-amd64.gz ssh-cert-authority-linux-amd64.gz
 
 test:
 	@go test ./...
