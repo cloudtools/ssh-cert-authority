@@ -596,7 +596,7 @@ func (h *certRequestHandler) signOrRejectRequest(rw http.ResponseWriter, req *ht
 	// Make sure the key attempting to sign the request is not the same as the key in the CSR
 	if signerFp == requesterFp {
 		err = errors.New("Signed by the same key as key in request")
-		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)		
+		http.Error(rw, fmt.Sprintf("%v", err), http.StatusBadRequest)
 		return
 	}
 

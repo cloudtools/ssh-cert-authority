@@ -28,6 +28,10 @@ parameters of the certificate before deciding whether or not to actually
 sign the cert request. The signed certificate is again POSTed back to
 the server where the signature is validated.
 
+Note that a requester may not sign their own request. If a +1 is
+received for a request by the same key as the one in the request then
+the signing request is rejected.
+
 Once enough valid signatures are received the cert request is
 automatically signed using the signing key for the cert authority and
 made available for download by the requester using the request id.
