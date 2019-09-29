@@ -529,10 +529,7 @@ the .pub file will be used within authorized_keys on servers you wish to
 SSH to.
 
 ``--generate-rsa`` will generate a 4096 bit RSA key. ``--generate-ecdsa`` will
-generate a key from nist's p384 curve. ECDSA support is nonexistent on
-OS X hosts unless your users build openssh from scratch (or homebrew).
-This is considered painful. This may not be a problem on more modern
-versions of OS X (i.e. high sierra) but I haven't tried it.
+generate a key from nist's p384 curve.
 
 Requesting Certificates
 =======================
