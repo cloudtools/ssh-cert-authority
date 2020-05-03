@@ -143,7 +143,7 @@ or perhaps baking the change into an OS image or other form of snapshot).
 You have a choice of putting this ``authorized_keys`` file into
 ``$HOME/.ssh/authorized_keys`` or the change can be made system wide. For
 system wide configuration see ``sshd_config(5)`` and the
-``AuthorizedPrincipalsFile`` option.
+``TrustedUserCAKeys`` option.
 
 If you are modifying the user's ``authorized_keys`` file simply add a new
 line to ``authorized_keys`` of the form::
