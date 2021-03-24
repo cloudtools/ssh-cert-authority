@@ -30,7 +30,7 @@ func signCertFlags() []cli.Flag {
 	if home == "" {
 		home = "/"
 	}
-	configPath := home + "/.ssh_ca/signer_config.json"
+	configPath := home + "/.ssh_ca/requester_config.json"
 
 	return []cli.Flag{
 		cli.StringFlag{
@@ -53,7 +53,7 @@ func signCertFlags() []cli.Flag {
 
 func signCert(c *cli.Context) error {
 	configPath := c.String("config-file")
-	allConfig := make(map[string]ssh_ca_util.SignerConfig)
+	allConfig := make(map[string]ssh_ca_util.RequesterConfig)
 	err := ssh_ca_util.LoadConfig(configPath, &allConfig)
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("Load Config failed: %s", err), 1)
@@ -71,7 +71,9 @@ func signCert(c *cli.Context) error {
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
-	config := wrongTypeConfig.(ssh_ca_util.SignerConfig)
+	config := wrongTypeConfig.(ssh_ca_util.RequesterConfig)
+	
+	ssh_ca_util.StartTunnelIfNeeded(&config)
 
 	conn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {

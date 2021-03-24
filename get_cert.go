@@ -32,7 +32,7 @@ func getCertFlags() []cli.Flag {
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
-		cli.BoolTFlag{
+		cli.BoolFlag{
 			Name:  "add-key",
 			Usage: "When set automatically call ssh-add",
 		},
@@ -65,7 +65,7 @@ func getCert(c *cli.Context) error {
 	if err != nil {
 		return cli.NewExitError(fmt.Sprintf("%s", err), 1)
 	}
-	if c.BoolT("add-key") {
+	if c.Bool("add-key") {
 		err = addCertToAgent(cert, sshDir)
 		if err != nil {
 			return cli.NewExitError(fmt.Sprintf("%s", err), 1)
@@ -94,6 +94,9 @@ func addCertToAgent(cert *ssh.Certificate, sshDir string) error {
 }
 
 func downloadCert(config ssh_ca_util.RequesterConfig, certRequestID string, sshDir string) (*ssh.Certificate, error) {
+	ssh_ca_util.StartTunnelIfNeeded(&config)
+	//fmt.Printf("get_cert downloadCert using signer url: %s", config.SignerUrl)
+	
 	getResp, err := http.Get(config.SignerUrl + "cert/requests/" + certRequestID)
 	if err != nil {
 		return nil, fmt.Errorf("Didn't get a valid response: %s", err)
@@ -119,6 +122,7 @@ func downloadCert(config ssh_ca_util.RequesterConfig, certRequestID string, sshD
 		return nil, err
 	}
 	pubKeyPath = strings.Replace(pubKeyPath, ".pub", "-cert.pub", 1)
+	fmt.Printf("%s\n", getRespBuf)
 	err = ioutil.WriteFile(pubKeyPath, getRespBuf, 0644)
 	if err != nil {
 		fmt.Printf("Couldn't write certificate file to %s: %s\n", pubKeyPath, err)
