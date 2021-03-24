@@ -700,7 +700,7 @@ func signdFlags() []cli.Flag {
 
 	return []cli.Flag{
 		cli.StringFlag{
-			Name:  "config-file",
+			Name:  "config-file, c",
 			Value: configPath,
 			Usage: "Path to config.json",
 		},
